@@ -43,6 +43,12 @@ atomic vault intent update <ID> --status done
 - **One intent per turn.** Every prompt gets its own intent.
 - **Problem first.** Reframe solution-requests as problems. Ask questions if unclear.
 - **Write the intent file before coding.** The plan goes in the file, not just in chat.
+- **Use Atomic for code discovery in every mode, including Plan Mode.** Before using Claude Code `Grep`, `Glob`, shell `grep`, `find`, `rg`, or similar filesystem search tools, first try the Atomic knowledge graph and content index:
+  - Source text: `atomic vault query code "pattern" -t <type>`
+  - Structure: `atomic vault query search "term"`
+  - Relationships: `atomic vault query neighbors <node_id>`
+  - File outline: `atomic vault query entities <path>`
+- **Only fall back to `Grep`/`Glob`/`find` if Atomic query commands fail, the repository has no content index/KG yet, or you need to inspect files that are not tracked/indexed by Atomic.** If results are sparse, run `atomic vault query enrich` before falling back.
 - **Do not run `atomic add` or `atomic record`.** Hooks handle this with provenance.
 - **Do not create or switch views.** The session view is created automatically.
 - **Do not run `atomic agent enable`.** The integration is already configured globally.
