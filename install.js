@@ -23,11 +23,16 @@ const uninstall = process.argv.includes("--uninstall");
 
 const PKG_DIR = __dirname;
 const SKILLS_TARGET = path.join(os.homedir(), ".claude", "skills");
+const MANIFEST = path.join(PKG_DIR, "hooks", "claude-code.atomic-hooks.json");
 
 const SKILL_LINKS = [
   {
     src: "skills/atomic-vault/SKILL.md",
     dst: "atomic-vault/SKILL.md",
+  },
+  {
+    src: "skills/atomic-vcs/SKILL.md",
+    dst: "atomic-vcs/SKILL.md",
   },
   {
     src: "skills/code-intelligence/SKILL.md",
@@ -62,21 +67,25 @@ function tryExec(cmd) {
 }
 
 function doInstall() {
-  // 1. Install hooks via atomic CLI
+  // 1. Register hooks by delegating the merge to the atomic binary. The
+  //    manifest in this repo is the source of truth — when Claude Code changes
+  //    its hook schema, edit the manifest and re-publish; no `atomic` rebuild.
   const hasAtomic = tryExec("atomic --version");
   if (hasAtomic) {
-    const installed = tryExec("atomic agent enable --agent claude-code --global");
+    const installed = tryExec(`atomic agent enable --hooks "${MANIFEST}"`);
     if (!silent) {
-      if (installed) {
-        console.log("  hooks: installed into ~/.claude/settings.json");
-      } else {
-        console.log("  hooks: already installed (or install failed)");
-      }
+      console.log(
+        installed
+          ? "  hooks: registered via atomic agent enable --hooks → ~/.claude/settings.json"
+          : "  hooks: enable failed (see output above)",
+      );
     }
   } else {
     if (!silent) {
       console.warn("  hooks: skipped (atomic not found on PATH)");
-      console.warn("         run 'atomic agent enable --agent claude-code --global' after installing Atomic");
+      console.warn(
+        `         after installing Atomic, run: atomic agent enable --hooks "${MANIFEST}"`,
+      );
     }
   }
 
@@ -111,19 +120,25 @@ function doInstall() {
 
   if (!silent) {
     console.log();
-    console.log(`✓ atomic-claude installed (${linked} skills linked, ${skipped} skipped)`);
+    console.log(
+      `✓ atomic-claude installed (${linked} skills linked, ${skipped} skipped)`,
+    );
     console.log();
-    console.log("Copy CLAUDE.md into your project root to enable the agent prompt:");
-    console.log(`  cp ${path.join(PKG_DIR, "CLAUDE.md")} /path/to/your/project/`);
+    console.log(
+      "Copy CLAUDE.md into your project root to enable the agent prompt:",
+    );
+    console.log(
+      `  cp ${path.join(PKG_DIR, "CLAUDE.md")} /path/to/your/project/`,
+    );
     console.log();
   }
 }
 
 function doUninstall() {
-  // 1. Remove hooks via atomic CLI
+  // 1. Remove hooks via the same manifest (delegated to the atomic binary)
   const hasAtomic = tryExec("atomic --version");
   if (hasAtomic) {
-    tryExec("atomic agent disable --agent claude-code --global");
+    tryExec(`atomic agent disable --hooks "${MANIFEST}"`);
     if (!silent) console.log("  hooks: removed from ~/.claude/settings.json");
   }
 
@@ -139,7 +154,11 @@ function doUninstall() {
       if (!silent) console.log(`  unlink: skills/${dst}`);
 
       const dir = path.dirname(dstPath);
-      try { fs.rmdirSync(dir); } catch { /* not empty */ }
+      try {
+        fs.rmdirSync(dir);
+      } catch {
+        /* not empty */
+      }
     }
   }
 

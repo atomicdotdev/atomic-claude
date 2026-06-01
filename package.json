@@ -1,7 +1,7 @@
 {
   "name": "atomic-claude",
   "version": "0.1.0",
-  "description": "Atomic VCS integration for Claude Code \u2014 automatic turn recording with AI provenance, intent tracking, and knowledge graph skills.",
+  "description": "Atomic VCS integration for Claude Code — automatic turn recording with AI provenance, intent tracking, and knowledge graph skills.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -17,6 +17,8 @@
   ],
   "files": [
     "CLAUDE.md",
+    "hooks/",
+    "agents/",
     "skills/",
     "install.js",
     "install.sh"

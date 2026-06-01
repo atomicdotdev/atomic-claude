@@ -79,7 +79,7 @@ How to verify the work is correct.
 Any additional context, decisions, or open questions.
 ```
 
-After editing intent markdown files, run `atomic vault sync` to persist changes back to the vault database.
+After editing an intent file, run `atomic vault sync` to persist your changes to the vault database. The CLI reads `show`/`update`/`list` from the database, not the file — so sync **before** every `show` and `update`, or `show` will render the stale placeholder and `update` will re-materialize the database copy over your edits, clobbering them. (`atomic vault sync` is not `atomic record` — hooks handle recording; you still run `sync`.)
 
 ## Full Workflow (End to End)
 
@@ -108,50 +108,40 @@ atomic vault goal start "auth-implementation"
 atomic vault intent link <intent-id> --goal auth-implementation
 ```
 
-### 4. Create a draft view and switch to it
+### 4. Do the work
+
+Write code and iterate. You do **not** create or switch views, and you do **not** run `atomic add` or `atomic record` — the integration's hooks own all of that:
+
+- **Session start** forks a draft view from your current view and switches into it automatically (a haikunator-named view, e.g. `early-ridge-ffd9`). Your whole session runs inside it.
+- **Turn end** records automatically — the hook runs `status` → `add` (tracks new files) → `record --all` with full AI provenance (model, tokens, cost, session, decision graph).
+- **Session end** switches back to your original view.
+
+To review what the hooks recorded (diff, provenance, AI attestation), use the `atomic-vcs` skill: `atomic log -f oneline`, then `atomic change -p -a`.
+
+### 5. Update intent status
 
 ```bash
-atomic view create auth-feature --draft
-atomic view switch auth-feature
-```
-
-Draft views are isolated workspaces. Always create a draft view for new work.
-
-### 5. Do the work
-
-Write code, add files, iterate.
-
-```bash
-atomic add src/auth.rs
-atomic add src/auth_test.rs
-```
-
-### 6. Record changes
-
-```bash
-atomic record -m "feat: add user authentication module"
-```
-
-Record frequently — small, focused changes are better than large ones.
-
-### 7. Update intent status
-
-```bash
+atomic vault sync                                  # persist file edits first
 atomic vault intent update <id> --status review
 ```
 
-### 8. Stop the goal when done
+Always `atomic vault sync` before `intent update` — `update` re-materializes the database copy over the file, so an unsynced update discards your edits.
+
+### 6. Stop the goal when done
 
 ```bash
 atomic vault goal stop
+atomic vault sync
 atomic vault intent update <id> --status done
 ```
 
-### 9. Sync vault state
+### 7. Sync vault state
 
 ```bash
 atomic vault sync
 ```
+
+A final sync ensures every vault edit is in the database before the turn's automatic record captures it.
 
 ## Resuming Work
 
@@ -160,8 +150,7 @@ If you stopped a goal and need to come back:
 ```bash
 atomic vault goal list                  # Find the suspended goal
 atomic vault goal resume "auth-implementation"
-atomic view switch auth-feature         # Switch back to the draft view
-# Continue working...
+# Continue working — the hooks manage the session view for you
 ```
 
 ## Tips
@@ -169,5 +158,5 @@ atomic view switch auth-feature         # Switch back to the draft view
 - One intent per unit of work — keep them focused
 - Start every session by checking `atomic vault intent list` and `atomic vault goal list`
 - Fill in the intent markdown completely before starting implementation
-- Use `atomic vault sync` after editing any vault markdown files
-- Draft views keep your work isolated until it's ready to insert into a shared view
+- Run `atomic vault sync` after editing any vault markdown file, and before every `show`/`update`
+- You don't manage views or recording — hooks fork a draft view at session start, record at turn end, and restore your view at session end. Inspect the results with the `atomic-vcs` skill.

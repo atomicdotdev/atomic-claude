@@ -10,7 +10,7 @@ Automatic turn recording with AI provenance, intent tracking, and knowledge grap
 - **Every turn records with provenance** — model, vendor, session, turn number, timing
 - **Tool executions tracked** — reads, edits, bash calls captured in a causal decision graph
 - **Intent workflow** — CLAUDE.md prompt guides problem-first development with vault intents
-- **Skills on demand** — `/atomic-vault` and `/code-intelligence` loaded when needed
+- **Skills on demand** — `/atomic-vault`, `/atomic-vcs`, and `/code-intelligence` loaded when needed
 
 ## Install
 
@@ -34,8 +34,8 @@ npx atomic-claude
 
 ### What install does
 
-1. **Hooks** — runs `atomic agent enable --agent claude-code --global` to install hook entries into `~/.claude/settings.json`
-2. **Skills** — symlinks `/atomic-vault` and `/code-intelligence` into `~/.claude/skills/`
+1. **Hooks** — runs `atomic agent enable --hooks hooks/claude-code.atomic-hooks.json` to merge the hook entries (and the `permissions.deny` rule) into `~/.claude/settings.json`. The hook definitions live in this repo's manifest, so updating Claude Code's hook wiring never requires rebuilding `atomic`.
+2. **Skills & agents** — symlinks `/atomic-vault`, `/atomic-vcs`, `/code-intelligence` into `~/.claude/skills/` and the `@intent` agent into `~/.claude/agents/`
 3. **CLAUDE.md** — must be copied to each project root manually (Claude Code auto-discovers it)
 
 ## Prerequisites
@@ -81,13 +81,14 @@ atomic agent attest
 |------|---------|
 | `CLAUDE.md` | Agent prompt — copy to project roots for intent-per-turn workflow |
 | `skills/atomic-vault/SKILL.md` | Vault reference (`/atomic-vault` skill) |
+| `skills/atomic-vcs/SKILL.md` | Inspect state & history: `status`, `log`, `change -p`/`-a`, `diff` (`/atomic-vcs` skill) |
 | `skills/code-intelligence/SKILL.md` | Knowledge graph query patterns (`/code-intelligence` skill) |
 | `install.js` | Installs hooks + symlinks skills into `~/.claude/` |
 | `install.sh` | Development install |
 
 ## How hooks work
 
-Claude Code has a native hook system in `.claude/settings.json`. The Atomic CLI writes hook entries that call back to `atomic agent hooks claude-code <verb>`:
+Claude Code has a native hook system in `.claude/settings.json`. This package ships the hook definitions in `hooks/claude-code.atomic-hooks.json`; `atomic agent enable --hooks` merges them in (idempotently, preserving non-Atomic hooks). They call back to `atomic agent hooks claude-code <verb>`:
 
 ```
 Claude Code session start
@@ -117,8 +118,9 @@ npx atomic-claude --uninstall
 Or manually:
 
 ```bash
-atomic agent disable --agent claude-code --global
+atomic agent disable --hooks /path/to/atomic-claude/hooks/claude-code.atomic-hooks.json
 rm ~/.claude/skills/atomic-vault/SKILL.md
+rm ~/.claude/skills/atomic-vcs/SKILL.md
 rm ~/.claude/skills/code-intelligence/SKILL.md
 ```
 

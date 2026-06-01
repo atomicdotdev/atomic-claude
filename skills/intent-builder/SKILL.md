@@ -32,9 +32,20 @@ Optional flags:
 - `--assignee name` — who owns this
 - `--labels "security,auth"` — comma-separated tags
 
+### Sync edits to the database
+
+```
+atomic vault sync
+```
+
+The intent file lives on disk under `.vault/`, but `intent show`, `intent update`, and `intent list` read from the vault **database**, not the file. After you edit the intent file, run `atomic vault sync` to deflate your changes into the database. Skip this and the CLI will keep rendering the original placeholder template, and `intent update` will overwrite your file edits with that stale template. Sync before every `show` and before every `update`.
+
+This is not `atomic record` — it only moves your `.vault/` edits into the vault database. It is required, and hooks do not do it for you mid-conversation.
+
 ### Show an intent
 
 ```
+atomic vault sync           # always sync first so you read fresh state
 atomic vault intent show ATOM-42
 atomic vault intent show ATOM-42 --json
 ```
@@ -44,14 +55,17 @@ Use this to read back the current state before presenting to the user.
 ### Confirm the intent
 
 ```
+atomic vault sync                                  # persist file edits first
 atomic vault intent update ATOM-42 --status planned
 ```
 
-Only run this after the user explicitly approves.
+Only run this after the user explicitly approves. Always `atomic vault sync` first — `update` re-materializes the database copy over the file, so an unsynced `update` discards your edits.
 
 ## The intent file
 
-After `create`, edit the file at `.vault/intents/<id>/intent.md`. Replace every section:
+After `create`, edit the file at `.vault/intents/<id>/intent.md`. Replace every section.
+
+**After every edit, run `atomic vault sync`.** The edits land on disk, but the CLI reads from the vault database. Without a sync, `show` renders the stale placeholder and `update` can clobber your edits with it.
 
 ### Problem (required)
 
@@ -66,6 +80,33 @@ Checklist items that are testable — a reviewer or test suite could verify each
 
 Bad: "- [ ] Auth works"
 Good: "- [ ] OAuth2 authorization code flow with PKCE returns a valid JWT"
+
+### Simplification guard (run before you finalize)
+
+Whenever you pick an approach that is *simpler than* or *diverges from* a reference — the standard library, an existing implementation, a spec, or a prior version — the simpler choice almost always **drops a behavior the reference guaranteed**. Those dropped behaviors are where silent correctness gaps hide, and they propagate: an intent that never names the dropped behavior produces code *and* tests that share the same blind spot, so nothing catches it.
+
+For every "we'll use the simpler X" decision, do all three:
+
+1. **Name the reference** you're simplifying away from (e.g., `std::io::BufWriter::into_parts`).
+2. **Enumerate what the simpler choice drops** — the guarantees, edge cases, or states the reference handled that yours won't by default. Common culprits: interrupted/partial operations, error or panic states, round-trip fidelity, ordering, resource cleanup, concurrency, overflow/empty/boundary inputs.
+3. For each dropped behavior, pick **one** and write it down:
+   - **Pin it** — add an explicit acceptance criterion that preserves the behavior, or
+   - **Drop it on purpose** — record it under *Scope — Out* with the consequence stated, or
+   - **Ask** — if you can't decide, raise it as a user question. Don't guess.
+
+**A decision about API *shape* is not a decision about *behavior*.** Choosing signature `A` over signature `B` does not settle whether the implementation preserves the reference's edge-case handling. Call those out as separate items — the same signature can be implemented correctly or incorrectly.
+
+Worked example (real):
+
+> Decision: use tokio-flavored `into_parts(self) -> (W, Vec<u8>)` instead of std's `into_parts(self) -> (W, Result<Vec<u8>, WriterPanicked>)`.
+>
+> The *signature* is settled (and correct — tokio never flushes on drop, so `WriterPanicked` is meaningless). But the simpler form silently drops std's handling of a **partially flushed buffer**. That's a separate, behavioral question — resolve it explicitly:
+>
+> - [ ] `into_parts` drains already-written bytes so a round-trip never re-emits them — *pin it*, or
+> - **Out:** a round-trip after an interrupted flush may re-emit written bytes — *drop on purpose*, or
+> - Ask the user which they want.
+
+In the run that produced this skill's motivating bug, step 3 was skipped for exactly that case: the signature question was asked and answered, the drain question never was, and the gap shipped invisibly. This section exists so that never happens silently again.
 
 ### Scope — In (required, at least 1)
 
