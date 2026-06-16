@@ -108,9 +108,24 @@ atomic vault goal start "auth-implementation"
 atomic vault intent link <intent-id> --goal auth-implementation
 ```
 
-### 4. Do the work
+### 4. Do the work and check off TODOs as you go
 
-Write code and iterate. You do **not** create or switch views, and you do **not** run `atomic add` or `atomic record` — the integration's hooks own all of that:
+Write code and iterate. As each TODO is completed, verify it meets its criteria, then mark it done in the intent file using your **file editing tool** (not Python, not bash, not sed — use the agent's native edit capability):
+
+```
+# In the intent file, change:
+- [ ] `PROJ-1/1` Scaffold package.json
+# to:
+- [x] `PROJ-1/1` Scaffold package.json
+```
+
+Also check off the corresponding acceptance criteria when all criteria for that TODO are satisfied. After every edit to the intent file, run `atomic vault sync` to persist to the database.
+
+**Verify before checking off.** Run the actual commands or tests that prove the TODO is done. Do not mark a TODO complete speculatively.
+
+**Never use Python, bash scripts, or sed to edit intent files.** Use your agent's native file editing tool. Raw file manipulation bypasses the vault's integrity guarantees.
+
+You do **not** create or switch views, and you do **not** run `atomic add` or `atomic record` — the integration's hooks own all of that:
 
 - **Session start** forks a draft view from your current view and switches into it automatically (a haikunator-named view, e.g. `early-ridge-ffd9`). Your whole session runs inside it.
 - **Turn end** records automatically — the hook runs `status` → `add` (tracks new files) → `record --all` with full AI provenance (model, tokens, cost, session, decision graph).
@@ -118,12 +133,20 @@ Write code and iterate. You do **not** create or switch views, and you do **not*
 
 To review what the hooks recorded (diff, provenance, AI attestation), use the `atomic-vcs` skill: `atomic log -f oneline`, then `atomic change -p -a`.
 
-### 5. Update intent status
+### 5. Complete the intent
 
-```bash
-atomic vault sync                                  # persist file edits first
-atomic vault intent update <id> --status review
-```
+When all TODOs are checked off:
+
+1. **Verify** every acceptance criterion by running the actual commands/tests.
+2. **Check off** all acceptance criteria in the intent file using your file editing tool.
+3. **Sync** to persist your edits:
+   ```bash
+   atomic vault sync
+   ```
+4. **Mark done:**
+   ```bash
+   atomic vault intent update <id> --status done
+   ```
 
 Always `atomic vault sync` before `intent update` — `update` re-materializes the database copy over the file, so an unsynced update discards your edits.
 

@@ -30,7 +30,20 @@ Then run `atomic vault sync` to persist the file into the vault database. The in
 
 ### 3. Execute the tasks
 
-Work through the tasks. Check off tasks as you complete them.
+Work through the TODOs in order. After completing each one:
+
+1. **Verify** it meets its criteria — run the commands or checks specified in the TODO.
+2. **Edit the intent file** using your file editing tool to mark it done:
+   ```
+   - [ ] `HELL-1/1` ...   →   - [x] `HELL-1/1` ...
+   ```
+   Also check off any acceptance criteria that are now satisfied.
+3. **Sync** so the database stays current:
+   ```bash
+   atomic vault sync
+   ```
+
+**Use your file editing tool to check off tasks — not bash, not Python, not sed.** Raw file manipulation bypasses the vault.
 
 ### 4. Update the intent
 

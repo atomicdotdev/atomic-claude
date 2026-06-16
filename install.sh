@@ -29,16 +29,11 @@ AGENTS_TARGET="$HOME/.claude/agents"
 mkdir -p "$AGENTS_TARGET"
 
 agents_linked=0
-agents_skipped=0
 for agent in "$SCRIPT_DIR"/agents/*.md; do
   [ -f "$agent" ] || continue
   name="$(basename "$agent")"
-  if [ -L "$AGENTS_TARGET/$name" ] || [ -f "$AGENTS_TARGET/$name" ]; then
-    agents_skipped=$((agents_skipped + 1))
-  else
-    ln -sf "$agent" "$AGENTS_TARGET/$name"
-    agents_linked=$((agents_linked + 1))
-  fi
+  ln -sf "$agent" "$AGENTS_TARGET/$name"
+  agents_linked=$((agents_linked + 1))
 done
 
 # 3. Symlink skills into ~/.claude/skills/
@@ -46,18 +41,13 @@ SKILLS_TARGET="$HOME/.claude/skills"
 mkdir -p "$SKILLS_TARGET"
 
 skills_linked=0
-skills_skipped=0
 for skill_dir in "$SCRIPT_DIR"/skills/*/; do
   [ -d "$skill_dir" ] || continue
   name="$(basename "$skill_dir")"
   mkdir -p "$SKILLS_TARGET/$name"
   if [ -f "$skill_dir/SKILL.md" ]; then
-    if [ -L "$SKILLS_TARGET/$name/SKILL.md" ] || [ -f "$SKILLS_TARGET/$name/SKILL.md" ]; then
-      skills_skipped=$((skills_skipped + 1))
-    else
-      ln -sf "$skill_dir/SKILL.md" "$SKILLS_TARGET/$name/SKILL.md"
-      skills_linked=$((skills_linked + 1))
-    fi
+    ln -sf "$skill_dir/SKILL.md" "$SKILLS_TARGET/$name/SKILL.md"
+    skills_linked=$((skills_linked + 1))
   fi
 done
 
@@ -73,9 +63,9 @@ What was installed:
                  'atomic agent enable --hooks'; also adds the permissions.deny
                  rule for .atomic/metadata. Definitions live in
                  ${MANIFEST})
-  • Agents     ${agents_linked} symlinked, ${agents_skipped} left as-is
+  • Agents     ${agents_linked} symlinked (always re-linked)
                → ~/.claude/agents/  (e.g. @intent)
-  • Skills     ${skills_linked} symlinked, ${skills_skipped} left as-is
+  • Skills     ${skills_linked} symlinked (always re-linked)
                → ~/.claude/skills/  (/atomic-vault, /atomic-vcs, /code-intelligence, ...)
 
 Symlinks point back into this checkout:
