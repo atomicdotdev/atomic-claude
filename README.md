@@ -43,6 +43,10 @@ npx atomic-claude
 - [Atomic VCS](https://atomic.dev) installed and on your PATH (`atomic --version`)
 - A project with an `.atomic/` repository (`atomic init`)
 - [Claude Code](https://code.claude.com) installed
+- `jq` (optional, recommended) — lets the hooks recover the model name from the
+  session transcript when Claude Code omits it from the hook payload (see below).
+  Without `jq` the hooks still work; the model is just captured only when Claude
+  Code provides it.
 
 ## Usage
 
@@ -97,6 +101,7 @@ Claude Code session start
   │
   ├── User sends prompt
   │   ├── Hook fires UserPromptSubmit → Rust saves prompt + model on session
+  │   │     (model is backfilled from the transcript if the payload omits it)
   │   ├── Agent works (edits, bash, reads)
   │   │   ├── Hook fires PreToolUse[Task] → Rust tracks sub-agent timing
   │   │   └── Hook fires PostToolUse[Task] → Rust appends to provenance graph
@@ -108,6 +113,19 @@ Claude Code session start
   └── Session ends
       └── Hook fires SessionEnd → Rust creates attestation
 ```
+
+### Model capture on resume
+
+Claude Code only includes the `model` field in the **SessionStart** hook payload,
+and even then omits it when a session is resumed, continued, or restarted after
+`/clear` or compaction. In those cases the recorded change would show
+`Model: unknown` even though a model is clearly in use.
+
+To close that gap, the `SessionStart` and `UserPromptSubmit` hooks read the model
+from the session transcript (`transcript_path`, where every assistant message
+carries `message.model`) whenever the hook payload doesn't already provide one.
+This uses `jq` and degrades gracefully — if `jq` isn't installed or the transcript
+has no model yet, the hook behaves exactly as before and recording is unaffected.
 
 ## Uninstall
 
