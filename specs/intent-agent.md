@@ -4,6 +4,8 @@
 **Created:** 2025-07-22
 **Scope:** Atomic Agent Harness — Intent Agent for Claude Code
 
+> **Historical draft:** This document describes the original 2025 Intent Agent prototype and is not the current runtime contract. See [`../README.md`](../README.md), [`../CLAUDE.md`](../CLAUDE.md), and [`../agents/intent.md`](../agents/intent.md) for the installed memory-first workflow.
+
 ---
 
 ## 1. Overview

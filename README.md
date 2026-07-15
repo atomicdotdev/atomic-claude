@@ -96,6 +96,8 @@ atomic agent attest
 | `skills/code-intelligence/SKILL.md` | Knowledge graph query patterns (`/code-intelligence` skill) |
 | `install.js` | Installs hooks + symlinks skills and the `@intent` agent into `~/.claude/` |
 | `install.sh` | Development install |
+| `specs/intent-agent.md` | Historical design draft for the original Intent Agent architecture |
+| `specs/test-plan-task1.md` | Historical manual test plan for the original Intent Agent prototype |
 
 ## How hooks work
 
