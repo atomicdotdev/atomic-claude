@@ -27,6 +27,7 @@
     "atomic-claude": "install.js"
   },
   "scripts": {
-    "postinstall": "node install.js --silent"
+    "postinstall": "node install.js --silent",
+    "test": "node --test"
   }
 }

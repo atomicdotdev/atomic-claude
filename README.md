@@ -9,6 +9,7 @@ Automatic turn recording with AI provenance, intent tracking, and knowledge grap
 - **1 session = 1 view** — a draft view is created automatically when you start Claude Code
 - **Every turn records with provenance** — model, vendor, session, turn number, timing
 - **Tool executions tracked** — reads, edits, bash calls captured in a causal decision graph
+- **Memory research before work** — retrieve, bootstrap, or expand durable project memory before drafting an intent
 - **Intent workflow** — CLAUDE.md prompt guides problem-first development with vault intents
 - **Skills on demand** — `/atomic-vault`, `/atomic-vcs`, and `/code-intelligence` loaded when needed
 
@@ -35,12 +36,12 @@ npx atomic-claude
 ### What install does
 
 1. **Hooks** — runs `atomic agent enable --hooks hooks/claude-code.atomic-hooks.json` to merge the hook entries (and the `permissions.deny` rule) into `~/.claude/settings.json`. The hook definitions live in this repo's manifest, so updating Claude Code's hook wiring never requires rebuilding `atomic`.
-2. **Skills & agents** — symlinks `/atomic-vault`, `/atomic-vcs`, `/code-intelligence` into `~/.claude/skills/` and the `@intent` agent into `~/.claude/agents/`
+2. **Skills & agents** — symlinks the five packaged skills into `~/.claude/skills/` and the `@intent` agent into `~/.claude/agents/`
 3. **CLAUDE.md** — must be copied to each project root manually (Claude Code auto-discovers it)
 
 ## Prerequisites
 
-- [Atomic VCS](https://atomic.dev) installed and on your PATH (`atomic --version`)
+- [Atomic VCS](https://atomic.dev) installed and on your PATH (`atomic --version`), with `atomic vault context` support
 - A project with an `.atomic/` repository (`atomic init`)
 - [Claude Code](https://code.claude.com) installed
 
@@ -62,6 +63,16 @@ The hooks automatically:
 
 You never need to run `atomic add` or `atomic record` — the hooks handle it.
 
+### Memory research flow
+
+Before an intent is drafted, the agent runs `atomic vault context` and treats the results as candidates:
+
+- A sufficient memory is selected and recorded on the intent with its path and revision.
+- A partial memory is expanded only with verified facts or explicit user decisions.
+- An empty result bootstraps a memory only when durable knowledge exists; otherwise the task continues without one.
+
+The selected wiki-links become generic KG `REFERENCES` relationships after sync. Before implementation, the agent checks that the selected paths and revisions still match what the user accepted. This package does not yet automate post-task learning distillation; that is a separate write-back stage of the flywheel.
+
 ## Viewing provenance
 
 ```bash
@@ -79,11 +90,11 @@ atomic agent attest
 
 | File | Purpose |
 |------|---------|
-| `CLAUDE.md` | Agent prompt — copy to project roots for intent-per-turn workflow |
-| `skills/atomic-vault/SKILL.md` | Vault reference (`/atomic-vault` skill) |
+| `CLAUDE.md` | Agent prompt — copy to project roots for the memory-to-intent workflow |
+| `skills/atomic-vault/SKILL.md` | Memory research plus intent and goal lifecycle (`/atomic-vault` skill) |
 | `skills/atomic-vcs/SKILL.md` | Inspect state & history: `status`, `log`, `change -p`/`-a`, `diff` (`/atomic-vcs` skill) |
 | `skills/code-intelligence/SKILL.md` | Knowledge graph query patterns (`/code-intelligence` skill) |
-| `install.js` | Installs hooks + symlinks skills into `~/.claude/` |
+| `install.js` | Installs hooks + symlinks skills and the `@intent` agent into `~/.claude/` |
 | `install.sh` | Development install |
 
 ## How hooks work
@@ -122,6 +133,9 @@ atomic agent disable --hooks /path/to/atomic-claude/hooks/claude-code.atomic-hoo
 rm ~/.claude/skills/atomic-vault/SKILL.md
 rm ~/.claude/skills/atomic-vcs/SKILL.md
 rm ~/.claude/skills/code-intelligence/SKILL.md
+rm ~/.claude/skills/intent-builder/SKILL.md
+rm ~/.claude/skills/codebase-context/SKILL.md
+rm ~/.claude/agents/intent.md
 ```
 
 CLAUDE.md files in project roots must be removed manually.

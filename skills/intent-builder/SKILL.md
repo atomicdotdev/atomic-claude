@@ -25,7 +25,7 @@ Always run this before creating. If an existing intent covers the same problem, 
 atomic vault intent create --title "Short title under 80 chars"
 ```
 
-Returns an intent ID (e.g., `ATOM-42`) and a file path under `.vault/intents/`. The file is a markdown template with placeholder sections. Your job is to fill them in.
+Returns an intent ID (e.g., `ATOM-42`) and an `intent_file` path under `.vault/intents/`. The file is a markdown template with placeholder sections. Use the exact returned path; do not construct one from the display ID.
 
 Optional flags:
 - `-p high` — priority: `low`, `medium`, `high`, `critical`
@@ -63,7 +63,7 @@ Only run this after the user explicitly approves. Always `atomic vault sync` fir
 
 ## The intent file
 
-After `create`, edit the file at `.vault/intents/<id>/intent.md`. Replace every section.
+After `create`, edit the exact `intent_file` returned by the command. Replace every section.
 
 **After every edit, run `atomic vault sync`.** The edits land on disk, but the CLI reads from the vault database. Without a sync, `show` renders the stale placeholder and `update` can clobber your edits with it.
 

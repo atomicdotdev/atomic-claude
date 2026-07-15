@@ -4,25 +4,26 @@
  * atomic-claude install
  *
  * Installs Atomic hooks into ~/.claude/settings.json (via atomic CLI)
- * and symlinks skills into ~/.claude/skills/.
+ * and symlinks skills and agents into ~/.claude/.
  *
  * Usage:
  *   npx atomic-claude          # install from npm
  *   node install.js            # install from local checkout
  *   node install.js --silent   # postinstall (no output on success)
- *   node install.js --uninstall  # remove hooks and skill symlinks
+ *   node install.js --uninstall  # remove hooks, skill links, and agent links
  */
 
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 const silent = process.argv.includes("--silent");
 const uninstall = process.argv.includes("--uninstall");
 
 const PKG_DIR = __dirname;
 const SKILLS_TARGET = path.join(os.homedir(), ".claude", "skills");
+const AGENTS_TARGET = path.join(os.homedir(), ".claude", "agents");
 const MANIFEST = path.join(PKG_DIR, "hooks", "claude-code.atomic-hooks.json");
 
 const SKILL_LINKS = [
@@ -38,6 +39,21 @@ const SKILL_LINKS = [
     src: "skills/code-intelligence/SKILL.md",
     dst: "code-intelligence/SKILL.md",
   },
+  {
+    src: "skills/intent-builder/SKILL.md",
+    dst: "intent-builder/SKILL.md",
+  },
+  {
+    src: "skills/codebase-context/SKILL.md",
+    dst: "codebase-context/SKILL.md",
+  },
+];
+
+const AGENT_LINKS = [
+  {
+    src: "agents/intent.md",
+    dst: "intent.md",
+  },
 ];
 
 function ensureDir(filePath) {
@@ -47,19 +63,30 @@ function ensureDir(filePath) {
   }
 }
 
-function isOurSymlink(dstPath) {
+function entryExists(filePath) {
+  try {
+    fs.lstatSync(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+function isOurSymlink(dstPath, expectedSrcPath) {
   try {
     if (!fs.lstatSync(dstPath).isSymbolicLink()) return false;
     const target = fs.readlinkSync(dstPath);
-    return target.startsWith(PKG_DIR);
+    const resolvedTarget = path.resolve(path.dirname(dstPath), target);
+    return resolvedTarget === path.resolve(expectedSrcPath);
   } catch {
     return false;
   }
 }
 
-function tryExec(cmd) {
+function tryExec(command, args = []) {
   try {
-    execSync(cmd, { stdio: "pipe" });
+    execFileSync(command, args, { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -70,9 +97,9 @@ function doInstall() {
   // 1. Register hooks by delegating the merge to the atomic binary. The
   //    manifest in this repo is the source of truth — when Claude Code changes
   //    its hook schema, edit the manifest and re-publish; no `atomic` rebuild.
-  const hasAtomic = tryExec("atomic --version");
+  const hasAtomic = tryExec("atomic", ["--version"]);
   if (hasAtomic) {
-    const installed = tryExec(`atomic agent enable --hooks "${MANIFEST}"`);
+    const installed = tryExec("atomic", ["agent", "enable", "--hooks", MANIFEST]);
     if (!silent) {
       console.log(
         installed
@@ -96,19 +123,20 @@ function doInstall() {
   for (const { src, dst } of SKILL_LINKS) {
     const srcPath = path.join(PKG_DIR, src);
     const dstPath = path.join(SKILLS_TARGET, dst);
+    const dstExists = entryExists(dstPath);
 
     if (!fs.existsSync(srcPath)) {
       if (!silent) console.warn(`  skip: ${src} (not found in package)`);
       continue;
     }
 
-    if (fs.existsSync(dstPath) && !isOurSymlink(dstPath)) {
+    if (dstExists && !isOurSymlink(dstPath, srcPath)) {
       skipped++;
       if (!silent) console.log(`  keep: ${dst} (user file, not overwriting)`);
       continue;
     }
 
-    if (fs.existsSync(dstPath) || isOurSymlink(dstPath)) {
+    if (dstExists) {
       fs.unlinkSync(dstPath);
     }
 
@@ -118,10 +146,39 @@ function doInstall() {
     if (!silent) console.log(`  link: skills/${dst}`);
   }
 
+  // 3. Symlink agents
+  let agentsLinked = 0;
+
+  for (const { src, dst } of AGENT_LINKS) {
+    const srcPath = path.join(PKG_DIR, src);
+    const dstPath = path.join(AGENTS_TARGET, dst);
+    const dstExists = entryExists(dstPath);
+
+    if (!fs.existsSync(srcPath)) {
+      if (!silent) console.warn(`  skip: ${src} (not found in package)`);
+      continue;
+    }
+
+    if (dstExists && !isOurSymlink(dstPath, srcPath)) {
+      skipped++;
+      if (!silent) console.log(`  keep: agents/${dst} (user file, not overwriting)`);
+      continue;
+    }
+
+    if (dstExists) {
+      fs.unlinkSync(dstPath);
+    }
+
+    ensureDir(dstPath);
+    fs.symlinkSync(srcPath, dstPath);
+    agentsLinked++;
+    if (!silent) console.log(`  link: agents/${dst}`);
+  }
+
   if (!silent) {
     console.log();
     console.log(
-      `✓ atomic-claude installed (${linked} skills linked, ${skipped} skipped)`,
+      `✓ atomic-claude installed (${linked} skills, ${agentsLinked} agents linked, ${skipped} skipped)`,
     );
     console.log();
     console.log(
@@ -136,19 +193,20 @@ function doInstall() {
 
 function doUninstall() {
   // 1. Remove hooks via the same manifest (delegated to the atomic binary)
-  const hasAtomic = tryExec("atomic --version");
+  const hasAtomic = tryExec("atomic", ["--version"]);
   if (hasAtomic) {
-    tryExec(`atomic agent disable --hooks "${MANIFEST}"`);
+    tryExec("atomic", ["agent", "disable", "--hooks", MANIFEST]);
     if (!silent) console.log("  hooks: removed from ~/.claude/settings.json");
   }
 
   // 2. Remove skill symlinks
   let removed = 0;
 
-  for (const { dst } of SKILL_LINKS) {
+  for (const { src, dst } of SKILL_LINKS) {
+    const srcPath = path.join(PKG_DIR, src);
     const dstPath = path.join(SKILLS_TARGET, dst);
 
-    if (isOurSymlink(dstPath)) {
+    if (isOurSymlink(dstPath, srcPath)) {
       fs.unlinkSync(dstPath);
       removed++;
       if (!silent) console.log(`  unlink: skills/${dst}`);
@@ -162,9 +220,21 @@ function doUninstall() {
     }
   }
 
+  // 3. Remove agent symlinks
+  for (const { src, dst } of AGENT_LINKS) {
+    const srcPath = path.join(PKG_DIR, src);
+    const dstPath = path.join(AGENTS_TARGET, dst);
+
+    if (isOurSymlink(dstPath, srcPath)) {
+      fs.unlinkSync(dstPath);
+      removed++;
+      if (!silent) console.log(`  unlink: agents/${dst}`);
+    }
+  }
+
   if (!silent) {
     console.log();
-    console.log(`✓ atomic-claude uninstalled (${removed} skills removed)`);
+    console.log(`✓ atomic-claude uninstalled (${removed} links removed)`);
     console.log("  Note: CLAUDE.md in project roots must be removed manually.");
   }
 }
