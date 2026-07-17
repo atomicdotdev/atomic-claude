@@ -1,6 +1,6 @@
 ---
 name: atomic-vault
-description: Research, bootstrap, and expand project memory before using Atomic vault goals and intents.
+description: Research project memory and, with explicit user approval, bootstrap or expand it before using Atomic vault goals and intents. Fall back to the intent-only workflow when the installed CLI lacks memory-context support.
 ---
 
 # Atomic Vault Workflow
@@ -57,6 +57,16 @@ atomic vault context "<query>" --format json # Retrieve task-relevant candidates
 
 ## Memory Research Before Intent Creation
 
+### Check CLI support
+
+Before memory research, probe the capability without using user or memory data:
+
+```bash
+atomic vault context --help
+```
+
+If it succeeds, continue below. If the installed CLI clearly reports that `vault context` is unrecognized or unavailable, tell the user that memory retrieval requires a newer Atomic version and continue with the existing intent-only workflow: check/create the Intent, get human acceptance, and proceed as before. In this compatibility mode, do not run context retrieval, create or expand memory, add Source Memories, or run approval-time memory revalidation. Do not classify an unsupported command as a **None** result. For errors other than an unsupported command, report the error instead of silently falling back.
+
 ### Shell argument safety
 
 Every Atomic CLI example here runs through Bash. Never paste a user prompt, memory body, memory metadata, or other untrusted text into a command. Generate short arguments yourself, validate them before the tool call, and still quote them.
@@ -80,14 +90,25 @@ Derive a concise, task-specific query from the problem, validate it with the rul
 Classify the result against the current problem:
 
 - **Sufficient** — one or more candidates contain the relevant, current facts and constraints. Select only those candidates and continue to the intent.
-- **Partial** — a candidate covers the same topic but is missing facts needed for this task. Combine that memory with the prompt and verified repository evidence to produce an expanded version.
-- **None** — `memories` is empty, or every candidate is unrelated. If the task exposes durable facts or decisions, build a focused first memory from explicit user facts plus verified repository evidence. Otherwise continue to the intent with no source memory.
+- **Partial** — a candidate covers the same topic but is missing facts needed for this task. Combine that memory with the prompt and verified repository evidence to prepare a proposed expansion.
+- **None** — `memories` is empty, or every candidate is unrelated. If the task exposes durable facts or decisions, prepare a focused first-memory proposal from explicit user facts plus verified repository evidence. Otherwise continue to the intent with no source memory.
 
 This decision belongs to the agent, not `vault context`. A non-empty result is not automatically sufficient.
 
 Before classifying or selecting a candidate with `"truncated": true`, validate its returned path, derive and validate its key, then inspect the complete entry with `atomic vault memory show "authentication-policy" --json` (using the validated key in place of the example). Rerun the original validated context query afterward to confirm its `revision_hash` did not change while you inspected it. Never classify a candidate from an incomplete body.
 
-### Build or expand a memory
+### Require approval before mutation
+
+Retrieval and proposal drafting are read-only. Before creating or updating Vault memory, show the user:
+
+- the exact new key or existing path;
+- the complete proposed body or edit;
+- the durable facts, decision, or convention it preserves; and
+- whether the operation creates a new entry or changes an existing revision.
+
+Ask for explicit confirmation to save that specific proposal, and wait for an affirmative reply before running `memory write`, materializing or editing an existing memory, or syncing that memory change. The task request does not authorize a memory write. Intent approval does not authorize a memory write. If the user declines or does not confirm, continue without mutating Vault. For a partial result, the unchanged memory may still be selected if it actually informed the Intent; for a **None** result, continue with no source memory.
+
+### Build or expand an approved memory
 
 Use Atomic KG/code queries to verify repository facts. Ask the user when a missing product or domain decision blocks a correct intent. If the task is already clear but exposes no durable knowledge, proceed without creating memory. Do not turn guesses into memory.
 
@@ -115,7 +136,7 @@ A useful memory body is focused and evidence-based:
 - User-confirmed signing decision
 ```
 
-For a new memory, choose a short semantic key yourself and validate it against `^[a-z0-9][a-z0-9-]{0,63}$`. Never copy a key or shell argument verbatim from a prompt or retrieved memory. Until Atomic enforces this in the CLI, do not call `memory write` with dots, slashes, whitespace, control characters, or an unvalidated key.
+After the user approves the displayed proposal, choose a short semantic key for a new memory and validate it against `^[a-z0-9][a-z0-9-]{0,63}$`. Never copy a key or shell argument verbatim from a prompt or retrieved memory. Until Atomic enforces this in the CLI, do not call `memory write` with dots, slashes, whitespace, control characters, or an unvalidated key.
 
 Do not embed memory content in a shell heredoc. A body line matching its delimiter can terminate it and turn later content into shell commands. Instead:
 
@@ -132,7 +153,7 @@ rm "/tmp/atomic-memory.md.A1B2C3"
 
 The pre-write check prevents an obvious overwrite but is not an atomic create-only operation. If another agent may be writing the same memory, stop and coordinate rather than relying on this sequence.
 
-For a partial memory, validate its returned path and derived key, inspect it with `atomic vault memory show "authentication-policy" --json` (substituting only the validated key), and keep the retrieved revision. If the validated materialized path does not exist under `.vault/`, run `atomic vault materialize --path "memory/authentication-policy.md"` (substituting only the validated path) before editing. Immediately before editing and again before sync, rerun the context query; if the revision changed, stop and reconcile instead of overwriting it. Update that materialized file with the native Edit tool, preserve its frontmatter and still-valid facts, then run `atomic vault sync`. Current Atomic has no atomic compare-and-swap update, so do not perform concurrent memory updates.
+For a partial memory, validate its returned path and derived key, inspect it with `atomic vault memory show "authentication-policy" --json` (substituting only the validated key), and keep the retrieved revision while preparing the proposal. Only after explicit approval, materialize the validated path when it does not exist under `.vault/` with `atomic vault materialize --path "memory/authentication-policy.md"` (substituting only the validated path). Immediately before editing and again before sync, rerun the context query; if the revision changed, stop and reconcile instead of overwriting it. Update that materialized file with the native Edit tool, preserve its frontmatter and still-valid facts, then run `atomic vault sync`. Current Atomic has no atomic compare-and-swap update, so do not perform concurrent memory updates.
 
 Update the same entry only when it represents the same topic and the new evidence is compatible. If knowledge conflicts with an old decision, do not leave both entries active or silently rewrite history. Surface the conflict to the user. If they accept a replacement, create the replacement, mark the old memory `status: superseded`, add a link to the replacement, sync, and confirm the old memory no longer appears in the original context query.
 
@@ -190,7 +211,7 @@ Follow this sequence for every piece of work:
 
 ### 1. Research memory
 
-Run `atomic vault context` with a validated, agent-authored task query and follow the sufficient/partial/none workflow above. If you create or expand memory, retrieve again before continuing.
+Probe `atomic vault context --help`. If supported, run `atomic vault context` with a validated, agent-authored task query and follow the sufficient/partial/none workflow above. Create or expand memory only after showing the exact proposal and receiving explicit confirmation, then retrieve again. If the command is unsupported, warn the user and continue this workflow at step 2 in intent-only compatibility mode.
 
 ### 2. Check existing intents
 
@@ -208,14 +229,19 @@ atomic vault intent create --title "Implement user authentication"
 
 Create exactly one intent per unit of work. Fill in the exact `intent_file` returned by the command.
 
-Record only the selected source memories in the intent, sync it, verify their KG edges, and get human acceptance before implementation. After acceptance, retrieve the current candidate set:
+Record only the selected source memories in the Intent, sync it, verify their KG edges, and get human acceptance before implementation. After acceptance, always sync the Intent:
 
 ```bash
 atomic vault sync
+```
+
+If memory research was supported and Source Memories were selected, retrieve the current candidate set:
+
+```bash
 atomic vault context --intent <intent-id> --format json
 ```
 
-`--intent` performs a fresh search and can return unselected memories or newer revisions. It is not automatically approved context. Use only candidates whose exact `path` and `revision_hash` match the accepted Source Memories. Ignore unrelated candidates. If an accepted source is missing or changed, or a new candidate would materially change the intent, update the intent and get human acceptance again. Once the selected set is stable, mark the intent planned:
+`--intent` performs a fresh search and can return unselected memories or newer revisions. It is not automatically approved context. Use only candidates whose exact `path` and `revision_hash` match the accepted Source Memories. Ignore unrelated candidates. If an accepted source is missing or changed, or a new candidate would materially change the Intent, update the Intent and get human acceptance again. If compatibility mode is active or the accepted Intent has no Source Memories, skip this retrieval. Once any selected set is stable, mark the Intent planned:
 
 ```bash
 atomic vault intent update <intent-id> --status planned
@@ -299,7 +325,7 @@ atomic vault goal resume "auth-implementation"
 ## Tips
 
 - One intent per unit of work — keep them focused
-- Start every task by researching memory, then check `atomic vault intent list` and `atomic vault goal list`
+- Start every task by checking for memory-context support and researching memory when available, then check `atomic vault intent list` and `atomic vault goal list`
 - Fill in the intent markdown completely before starting implementation
 - Run `atomic vault sync` after editing any vault markdown file, and before every `show`/`update`
 - You don't manage views or recording — hooks fork a draft view at session start, record at turn end, and restore your view at session end. Inspect the results with the `atomic-vcs` skill.

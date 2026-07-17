@@ -31,6 +31,18 @@ test("researches memory before creating an intent", () => {
   }
 });
 
+test("falls back to the intent-only workflow when memory context is unsupported", () => {
+  for (const document of [agentPrompt, vaultSkill, intentAgent]) {
+    assert.match(document, /atomic vault context --help/);
+  }
+
+  assert.match(agentPrompt, /existing intent-only workflow/);
+  assert.match(vaultSkill, /existing intent-only workflow/);
+  assert.match(intentAgent, /intent-only compatibility mode/);
+  assert.match(vaultSkill, /Do not classify an unsupported command as a \*\*None\*\* result/);
+  assert.match(agentPrompt, /Never classify an unsupported command as an empty-memory result/);
+});
+
 test("does not interpolate raw user or memory data into Bash", () => {
   assert.match(agentPrompt, /Never paste the user's raw text into Bash/);
   assert.match(vaultSkill, /Never paste a user prompt, memory body, memory metadata/);
@@ -48,6 +60,18 @@ test("defines sufficient, partial, and empty-memory behavior", () => {
   assert.match(vaultSkill, /proceed without creating memory/);
   assert.match(vaultSkill, /continue to the intent with no source memory/);
   assert.match(vaultSkill, /run the original context query again/i);
+});
+
+test("requires separate user approval before any memory mutation", () => {
+  for (const document of [agentPrompt, vaultSkill, intentAgent]) {
+    assert.match(document, /explicit (?:user )?confirmation/);
+    assert.match(document, /Intent approval does not authorize a memory write/);
+  }
+
+  const approvalGuard = vaultSkill.indexOf("### Require approval before mutation");
+  const approvedWrite = vaultSkill.indexOf("atomic vault memory write", approvalGuard);
+  assert.ok(approvalGuard >= 0 && approvalGuard < approvedWrite);
+  assert.match(vaultSkill, /If the user declines or does not confirm, continue without mutating Vault/);
 });
 
 test("documents safe stdin memory writes and selected-source links", () => {
@@ -73,7 +97,10 @@ test("continues clarification and approval replies in the active intent", () => 
 });
 
 test("materializes database-only memories before editing", () => {
-  assert.match(vaultSkill, /materialized path does not exist under `\.vault\/`/);
+  assert.match(
+    vaultSkill,
+    /Only after explicit approval, materialize the validated path when it does not exist under `\.vault\/`/,
+  );
   assert.match(vaultSkill, /atomic vault materialize --path "memory\/authentication-policy\.md"/);
 });
 

@@ -9,7 +9,7 @@ Automatic turn recording with AI provenance, intent tracking, and knowledge grap
 - **1 session = 1 view** — a draft view is created automatically when you start Claude Code
 - **Every turn records with provenance** — model, vendor, session, turn number, timing
 - **Tool executions tracked** — reads, edits, bash calls captured in a causal decision graph
-- **Memory research before work** — retrieve, bootstrap, or expand durable project memory before drafting an intent
+- **Memory research before work** — retrieve durable project memory before drafting an intent, with explicit approval before any memory write
 - **Intent workflow** — CLAUDE.md prompt guides problem-first development with vault intents
 - **Skills on demand** — `/atomic-vault`, `/atomic-vcs`, and `/code-intelligence` loaded when needed
 
@@ -41,7 +41,7 @@ npx atomic-claude
 
 ## Prerequisites
 
-- [Atomic VCS](https://atomic.dev) installed and on your PATH (`atomic --version`), with `atomic vault context` support
+- [Atomic VCS](https://atomic.dev) installed and on your PATH (`atomic --version`). Memory research requires `atomic vault context`; older CLIs receive an upgrade warning and continue with the intent-only workflow
 - A project with an `.atomic/` repository (`atomic init`)
 - [Claude Code](https://code.claude.com) installed
 
@@ -68,8 +68,11 @@ You never need to run `atomic add` or `atomic record` — the hooks handle it.
 Before an intent is drafted, the agent runs `atomic vault context` and treats the results as candidates:
 
 - A sufficient memory is selected and recorded on the intent with its path and revision.
-- A partial memory is expanded only with verified facts or explicit user decisions.
-- An empty result bootstraps a memory only when durable knowledge exists; otherwise the task continues without one.
+- A partial memory produces an evidence-based expansion proposal.
+- An empty result produces a first-memory proposal only when durable knowledge exists; otherwise the task continues without one.
+- Creating or updating memory requires the agent to show the exact proposal and receive explicit user confirmation. The task request and Intent approval do not count as memory-write approval.
+
+The agent first probes `atomic vault context --help`. If the installed CLI does not support the command, it recommends upgrading and continues with the previous intent-only workflow instead of treating the command failure as an empty Vault.
 
 The selected wiki-links become generic KG `REFERENCES` relationships after sync. Before implementation, the agent checks that the selected paths and revisions still match what the user accepted. This package does not yet automate post-task learning distillation; that is a separate write-back stage of the flywheel.
 

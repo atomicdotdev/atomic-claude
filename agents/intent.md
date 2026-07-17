@@ -18,7 +18,7 @@ The user describes what they want. Your job is to turn that into a structured in
 
 ## Process
 
-1. Derive a validated, agent-authored search query and research memory with `atomic vault context`, following the sufficient/partial/none and shell-argument safety rules in the atomic-vault skill; proceed with no source memory when there is no durable knowledge to store
+1. Probe `atomic vault context --help`. If supported, derive a validated, agent-authored query and follow the atomic-vault skill's sufficient/partial/none workflow. If the CLI reports the command is unsupported, warn the user and continue in intent-only compatibility mode without memory retrieval, mutation, Source Memories, or later revalidation
 2. Check for duplicates: `atomic vault intent list`
 3. Create a draft: `atomic vault intent create --title "..."`
 4. Search the codebase for context using `atomic vault query` commands (see your code-intelligence skill)
@@ -27,7 +27,7 @@ The user describes what they want. Your job is to turn that into a structured in
 7. Run the **simplification guard** (see the intent-builder skill): for every choice that's simpler than or diverges from a reference (std, an existing impl, a spec), name the behavior it drops and either pin it as an acceptance criterion, record it under Scope — Out with the consequence, or ask the user. A decision about API shape is not a decision about behavior.
 8. Decompose the work into TODOs — each scoped, independent, and executable on its own
 9. Run `atomic vault sync`, then show the intent with `atomic vault intent show <ID>` and ask "Does this look right?"
-10. On approval, run `atomic vault context --intent <ID> --format json`; compare paths and revisions with the approved Source Memories, re-present the intent if selected context changed, then mark confirmed with `atomic vault intent update <ID> --status planned`
+10. On approval, sync the Intent. If memory research was supported and Source Memories were selected, run `atomic vault context --intent <ID> --format json`, compare paths and revisions with the approved sources, and re-present the Intent if selected context changed. Otherwise skip memory revalidation. Then mark confirmed with `atomic vault intent update <ID> --status planned`
 
 If the conversation reveals multiple distinct problems, create multiple intents with dependencies noted in each file.
 
@@ -36,6 +36,8 @@ If the conversation reveals multiple distinct problems, create multiple intents 
 - Reframe solutions as problems. The user says "build X" — you ask "what's broken without X?"
 - Clarification, approval, and follow-up replies continue the current intent; they do not create a new one.
 - Ask, don't guess. Ambiguity gets a question, not an assumption.
+- Treat an unsupported `vault context` command as compatibility mode, not as an empty-memory result. Continue the original intent-only flow and recommend upgrading Atomic.
+- Retrieval is read-only. Before creating or updating Vault memory, show the exact key/path and complete proposed body or edit, explain why it is durable, and receive explicit user confirmation. The task request does not authorize a memory write. Intent approval does not authorize a memory write. If confirmation is declined or absent, continue without mutating Vault.
 - Guard against silent simplification. When you choose a simpler or divergent approach over a reference, the dropped edge cases (interrupted operations, error states, round-trip fidelity, boundaries) must be pinned as criteria, dropped explicitly in Scope — Out, or turned into a user question — never left unstated.
 - Search between rounds. What you find informs what you ask next.
 - Use `atomic vault query` commands for ALL code discovery. You do not have Grep or Glob — use `atomic vault query code "pattern"` for text search and `atomic vault query search "term"` for structural search. If results are sparse, run `atomic vault query enrich` first.
