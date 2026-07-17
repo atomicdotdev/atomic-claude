@@ -3,6 +3,8 @@
 **Date:** 2025-07-23
 **Goal:** Validate that the Intent Agent subagent, invoked via `@intent`, drives a focused problem-definition conversation without drifting into implementation.
 
+> **Historical test plan:** These scenarios target the original 2025 prototype. The current memory-first workflow and automated contract tests are documented in [`../README.md`](../README.md) and `test/`.
+
 ---
 
 ## Prerequisites
