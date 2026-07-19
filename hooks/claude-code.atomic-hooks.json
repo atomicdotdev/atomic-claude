@@ -4,7 +4,7 @@
   "command_prefix": "atomic agent hooks claude-code",
   "hooks": {
     "SessionStart": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code session-start || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || exit 0; p=$(cat); m=$(printf '%s' \"$p\" | jq -r '.model // empty' 2>/dev/null); if [ -z \"$m\" ]; then t=$(printf '%s' \"$p\" | jq -r '.transcript_path // empty' 2>/dev/null); if [ -n \"$t\" ] && [ -f \"$t\" ]; then m=$(jq -rs 'map(.message.model? // empty) | map(select(. != \"\")) | last // empty' \"$t\" 2>/dev/null); [ -n \"$m\" ] && p=$(printf '%s' \"$p\" | jq -c --arg m \"$m\" '.model = $m' 2>/dev/null); fi; fi; printf '%s' \"$p\" | atomic agent hooks claude-code session-start || true" } ] }
     ],
     "SessionEnd": [
       { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code session-end || true" } ] }
@@ -13,7 +13,7 @@
       { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code stop || true" } ] }
     ],
     "UserPromptSubmit": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code user-prompt-submit || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || exit 0; p=$(cat); m=$(printf '%s' \"$p\" | jq -r '.model // empty' 2>/dev/null); if [ -z \"$m\" ]; then t=$(printf '%s' \"$p\" | jq -r '.transcript_path // empty' 2>/dev/null); if [ -n \"$t\" ] && [ -f \"$t\" ]; then m=$(jq -rs 'map(.message.model? // empty) | map(select(. != \"\")) | last // empty' \"$t\" 2>/dev/null); [ -n \"$m\" ] && p=$(printf '%s' \"$p\" | jq -c --arg m \"$m\" '.model = $m' 2>/dev/null); fi; fi; printf '%s' \"$p\" | atomic agent hooks claude-code user-prompt-submit || true" } ] }
     ],
     "PreToolUse": [
       { "matcher": "Task", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code pre-task || true" } ] }
