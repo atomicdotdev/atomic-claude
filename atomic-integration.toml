@@ -1,0 +1,33 @@
+schema = 1
+agent = "claude-code"
+version = "1.0.0"
+
+[requires]
+atomic = ">=0.11.0"
+
+[[file]]
+src = "agents/intent.md"
+dst = "~/.claude/agents/intent.md"
+
+[[file]]
+src = "skills/atomic-vault/SKILL.md"
+dst = "~/.claude/skills/atomic-vault/SKILL.md"
+
+[[file]]
+src = "skills/atomic-vcs/SKILL.md"
+dst = "~/.claude/skills/atomic-vcs/SKILL.md"
+
+[[file]]
+src = "skills/code-intelligence/SKILL.md"
+dst = "~/.claude/skills/code-intelligence/SKILL.md"
+
+[[file]]
+src = "skills/codebase-context/SKILL.md"
+dst = "~/.claude/skills/codebase-context/SKILL.md"
+
+[[file]]
+src = "skills/intent-builder/SKILL.md"
+dst = "~/.claude/skills/intent-builder/SKILL.md"
+
+[[settings]]
+manifest = "hooks/claude-code.atomic-hooks.json"

@@ -4,6 +4,8 @@
 
 Automatic turn recording with AI provenance, intent tracking, and knowledge graph skills.
 
+> **Definitive source:** this repository lives on Atomic storage at `https://atomic.atomic.storage/workspaces/oss/projects/atomic-claude/code`. The GitHub repo is a mirror.
+
 ## What it does
 
 - **1 session = 1 view** — a draft view is created automatically when you start Claude Code
@@ -17,20 +19,31 @@ Automatic turn recording with AI provenance, intent tracking, and knowledge grap
 
 ### Quick start
 
-```bash
-# Clone and install
-git clone https://github.com/atomicdotdev/atomic-claude
-cd atomic-claude
-./install.sh
+Requires the [Atomic VCS](https://atomic.dev) CLI on your PATH. Then:
 
-# Copy the agent prompt into your project
+```bash
+atomic agent enable --agent claude-code
+```
+
+The enable command syncs the package from Atomic storage and installs it.
+
+Then copy the agent prompt into each project:
+
+```bash
 cp CLAUDE.md /path/to/your/project/
 ```
 
-### From npm (once published)
+### Development install
+
+From a local checkout:
 
 ```bash
-npx atomic-claude
+git clone https://github.com/atomicdotdev/atomic-claude
+cd atomic-claude
+atomic agent enable --agent claude-code --from .
+
+# or the legacy script path:
+./install.sh
 ```
 
 ### What install does
@@ -128,7 +141,7 @@ Claude Code session start
 ## Uninstall
 
 ```bash
-npx atomic-claude --uninstall
+atomic agent disable --agent claude-code
 ```
 
 Or manually:

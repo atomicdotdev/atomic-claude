@@ -4,24 +4,24 @@
   "command_prefix": "atomic agent hooks claude-code",
   "hooks": {
     "SessionStart": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code session-start || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code session-start || true" } ] }
     ],
     "SessionEnd": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code session-end || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code session-end || true" } ] }
     ],
     "Stop": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code stop || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code stop || true" } ] }
     ],
     "UserPromptSubmit": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code user-prompt-submit || true" } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code user-prompt-submit || true" } ] }
     ],
     "PreToolUse": [
-      { "matcher": "Task", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code pre-task || true" } ] }
+      { "matcher": "Task", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code pre-task || true" } ] }
     ],
     "PostToolUse": [
-      { "matcher": "Task", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code post-task || true" } ] },
-      { "matcher": "TodoWrite", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code post-todo || true" } ] },
-      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic && atomic agent hooks claude-code post-tool || true" } ] }
+      { "matcher": "Task", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code post-task || true" } ] },
+      { "matcher": "TodoWrite", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code post-todo || true" } ] },
+      { "matcher": "", "hooks": [ { "type": "command", "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks claude-code post-tool || true" } ] }
     ]
   },
   "merge": {
