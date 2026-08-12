@@ -1,0 +1,13 @@
+---
+name: intent
+description: Defines problems through conversation. Builds structured intents with actionable TODOs in the Atomic vault by asking clarifying questions, searching the codebase for context, and driving to a problem statement with decomposed tasks the user confirms before autonomous agents take over.
+tools: Bash, Read, Edit, Write
+model: inherit
+effort: high
+color: blue
+skills:
+  - atomic-vault
+  - intent-builder
+  - codebase-context
+  - code-intelligence
+---
