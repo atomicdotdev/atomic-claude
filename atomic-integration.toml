@@ -8,21 +8,9 @@ atomic = ">=0.11.0"
 [skills-source]
 package = "atomic-skills"
 
-[[skill]]
-src = "skills/atomic-vault/SKILL.md"
-dst = "~/.claude/skills/atomic-vault/SKILL.md"
-
-[[skill]]
-src = "skills/atomic-vcs/SKILL.md"
-dst = "~/.claude/skills/atomic-vcs/SKILL.md"
-
-[[skill]]
-src = "skills/code-intelligence/SKILL.md"
-dst = "~/.claude/skills/code-intelligence/SKILL.md"
-
-[[skill]]
-src = "skills/intent-builder/SKILL.md"
-dst = "~/.claude/skills/intent-builder/SKILL.md"
+[skills]
+install = "all"
+dst_pattern = "~/.claude/skills/{name}/SKILL.md"
 
 [[repo-file]]
 src = "AGENTS.md"
