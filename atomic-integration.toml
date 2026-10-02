@@ -1,9 +1,9 @@
 schema = 1
 agent = "claude-code"
-version = "1.0.0"
+version = "0.2.0"
 
 [requires]
-atomic = ">=0.11.0"
+atomic = ">=0.18.3"
 
 [skills-source]
 package = "atomic-skills"
@@ -12,14 +12,81 @@ package = "atomic-skills"
 install = "all"
 dst_pattern = "~/.claude/skills/{name}/SKILL.md"
 
+[[file]]
+src = "plugin/.claude-plugin/plugin.json"
+dst = "~/.atomic/claude-code/activation/plugin/.claude-plugin/plugin.json"
+
+[[file]]
+src = "plugin/hooks/hooks.json"
+dst = "~/.atomic/claude-code/activation/plugin/hooks/hooks.json"
+
+[[file]]
+src = "plugin/hooks/register.js"
+dst = "~/.atomic/claude-code/activation/plugin/hooks/register.js"
+
+[[file]]
+src = "plugin/hooks/protocol.js"
+dst = "~/.atomic/claude-code/activation/plugin/hooks/protocol.js"
+
+[[file]]
+src = "plugin/hooks/finalize.cjs"
+dst = "~/.atomic/claude-code/activation/plugin/hooks/finalize.cjs"
+
+[[file]]
+src = "plugin/types/index.d.ts"
+dst = "~/.atomic/claude-code/activation/plugin/types/index.d.ts"
+
+[[file]]
+src = "plugin/check-version.cjs"
+dst = "~/.atomic/claude-code/activation/plugin/check-version.cjs"
+
+[[file]]
+src = "plugin/agents/intent.md"
+dst = "~/.atomic/claude-code/activation/plugin/agents/intent.md"
+
+[[file]]
+src = "plugin/skills/atomic-vault/SKILL.md"
+dst = "~/.atomic/claude-code/activation/plugin/skills/atomic-vault/SKILL.md"
+
+[[file]]
+src = "plugin/skills/atomic-vcs/SKILL.md"
+dst = "~/.atomic/claude-code/activation/plugin/skills/atomic-vcs/SKILL.md"
+
+[[file]]
+src = "plugin/skills/code-intelligence/SKILL.md"
+dst = "~/.atomic/claude-code/activation/plugin/skills/code-intelligence/SKILL.md"
+
+[[file]]
+src = "plugin/skills/intent-builder/SKILL.md"
+dst = "~/.atomic/claude-code/activation/plugin/skills/intent-builder/SKILL.md"
+
+[[file]]
+src = "plugin/skills/codebase-context/SKILL.md"
+dst = "~/.atomic/claude-code/activation/plugin/skills/codebase-context/SKILL.md"
+
+[[file]]
+src = "install.js"
+dst = "~/.atomic/claude-code/activation/install.js"
+
+[[file]]
+src = "CLAUDE.md"
+dst = "~/.atomic/claude-code/activation/CLAUDE.md"
+
+[[file]]
+src = "hooks/claude-code.atomic-hooks.json"
+dst = "~/.atomic/claude-code/activation/hooks/claude-code.atomic-hooks.json"
+
 [[repo-file]]
 src = "AGENTS.md"
 dst = "AGENTS.md"
 
 [agent-definition]
-src = "agents/intent.md.frontmatter"
+src = "plugin/agents/intent.md.frontmatter"
 body_from = "atomic-skills:AGENTS.md"
 slot = "~/.claude/agents/intent.md"
 
 [[settings]]
 manifest = "hooks/claude-code.atomic-hooks.json"
+
+[[settings]]
+manifest = "hooks/claude-code.version-check.json"

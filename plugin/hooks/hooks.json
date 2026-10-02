@@ -1,0 +1,4 @@
+{
+  "description": "Atomic-native workspace UI and lifecycle adapter",
+  "modules": ["./register.js"]
+}

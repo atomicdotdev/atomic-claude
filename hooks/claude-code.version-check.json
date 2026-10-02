@@ -1,0 +1,8 @@
+{
+  "target": "~/.claude/settings.json",
+  "hooks_key": "hooks",
+  "command_prefix": "atomic-claude-version-check",
+  "hooks": {
+    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node \"$HOME/.atomic/claude-code/activation/plugin/check-version.cjs\" --hook --atomic-claude-version-check" }] }]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "atomic-claude",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Atomic VCS integration for Claude Code — automatic turn recording with AI provenance, intent tracking, and knowledge graph skills.",
   "license": "Apache-2.0",
   "repository": {
@@ -18,8 +18,8 @@
   "files": [
     "CLAUDE.md",
     "hooks/",
-    "agents/",
-    "skills/",
+    "plugin/",
+    "atomic-integration.toml",
     "install.js",
     "install.sh"
   ],
@@ -28,6 +28,8 @@
   },
   "scripts": {
     "postinstall": "node install.js --silent",
-    "test": "node --test"
+    "test": "node --test test/*.test.js",
+    "test:mod": "claude plugin test ./plugin",
+    "validate:plugin": "claude plugin validate --strict ./plugin"
   }
 }

@@ -1,246 +1,146 @@
 #!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const { checkVersion } = require('./plugin/check-version.cjs');
 
-/**
- * atomic-claude install
- *
- * Installs Atomic hooks into ~/.claude/settings.json (via atomic CLI)
- * and symlinks skills and agents into ~/.claude/.
- *
- * Usage:
- *   npx atomic-claude          # install from npm
- *   node install.js            # install from local checkout
- *   node install.js --silent   # postinstall (no output on success)
- *   node install.js --uninstall  # remove hooks, skill links, and agent links
- */
-
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { execFileSync } = require("child_process");
-
-const silent = process.argv.includes("--silent");
-const uninstall = process.argv.includes("--uninstall");
-
-const PKG_DIR = __dirname;
-const SKILLS_TARGET = path.join(os.homedir(), ".claude", "skills");
-const AGENTS_TARGET = path.join(os.homedir(), ".claude", "agents");
-const MANIFEST = path.join(PKG_DIR, "hooks", "claude-code.atomic-hooks.json");
-
-const SKILL_LINKS = [
-  {
-    src: "skills/atomic-vault/SKILL.md",
-    dst: "atomic-vault/SKILL.md",
-  },
-  {
-    src: "skills/atomic-vcs/SKILL.md",
-    dst: "atomic-vcs/SKILL.md",
-  },
-  {
-    src: "skills/code-intelligence/SKILL.md",
-    dst: "code-intelligence/SKILL.md",
-  },
-  {
-    src: "skills/intent-builder/SKILL.md",
-    dst: "intent-builder/SKILL.md",
-  },
-  {
-    src: "skills/codebase-context/SKILL.md",
-    dst: "codebase-context/SKILL.md",
-  },
+const silent = process.argv.includes('--silent');
+const root = __dirname;
+const home = os.homedir();
+const plugin = path.join(root, 'plugin');
+const pluginTarget = path.join(home, '.claude', 'skills', 'atomic');
+const manifest = path.join(root, 'hooks', 'claude-code.atomic-hooks.json');
+const receiptPath = path.join(home, '.claude', 'atomic-claude', 'installer.json');
+const components = [
+  ...['atomic-vault', 'atomic-vcs', 'code-intelligence', 'intent-builder', 'codebase-context'].map(name => ({
+    src: path.join(plugin, 'skills', name, 'SKILL.md'), dst: path.join(home, '.claude', 'skills', name, 'SKILL.md'),
+  })),
+  { src: path.join(plugin, 'agents', 'intent.md'), dst: path.join(home, '.claude', 'agents', 'intent.md') },
 ];
 
-const AGENT_LINKS = [
-  {
-    src: "agents/intent.md",
-    dst: "intent.md",
-  },
-];
-
-function ensureDir(filePath) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+function exists(file) {
+  try { fs.lstatSync(file); return true; }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
 }
 
-function entryExists(filePath) {
+function pointsTo(dst, src) {
+  if (!src) return false;
+  try { return fs.lstatSync(dst).isSymbolicLink() && path.resolve(path.dirname(dst), fs.readlinkSync(dst)) === path.resolve(src); }
+  catch { return false; }
+}
+
+function loadReceipt() {
+  if (!exists(receiptPath)) return { schema: 1, links: {}, hooksInstalled: false };
+  const data = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+  if (data.schema !== 1 || !data.links || typeof data.links !== 'object') throw new Error('Invalid installer ownership receipt; refusing to overwrite it');
+  return data;
+}
+
+function saveReceipt(receipt) {
+  fs.mkdirSync(path.dirname(receiptPath), { recursive: true, mode: 0o700 });
+  const tmp = receiptPath + `.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, receiptPath);
+}
+
+function owned(dst, src, receipt) {
+  return pointsTo(dst, src) || pointsTo(dst, receipt.links[dst]) ||
+    (src.startsWith(plugin + path.sep) && pointsTo(dst, path.join(root, path.relative(plugin, src))));
+}
+
+function link(dst, src, receipt, directory = false) {
+  if (exists(dst) && !owned(dst, src, receipt)) {
+    console.warn(`Warning: keeping user-owned ${dst}; this component was not installed.`);
+    return false;
+  }
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  if (exists(dst)) fs.unlinkSync(dst);
+  fs.symlinkSync(src, dst, directory ? 'dir' : 'file');
+  receipt.links[dst] = src;
+  if (!silent) console.log(`  link: ${dst}`);
+  return true;
+}
+
+function atomic(args) {
   try {
-    fs.lstatSync(filePath);
-    return true;
+    return { ok: true, stdout: execFileSync('atomic', args, { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (error) {
-    if (error.code === "ENOENT") return false;
-    throw error;
+    return { ok: false, missing: error.code === 'ENOENT', diagnostic: String(error.stderr || error.stdout || error.message).trim() };
   }
 }
 
-function isOurSymlink(dstPath, expectedSrcPath) {
-  try {
-    if (!fs.lstatSync(dstPath).isSymbolicLink()) return false;
-    const target = fs.readlinkSync(dstPath);
-    const resolvedTarget = path.resolve(path.dirname(dstPath), target);
-    return resolvedTarget === path.resolve(expectedSrcPath);
-  } catch {
-    return false;
-  }
+function compatibleAtomic(output) {
+  const m = output.trim().match(/^atomic\s+(\d+)\.(\d+)\.(\d+)(?:\s|$)/);
+  if (!m) return false;
+  const [major, minor, patch] = m.slice(1).map(Number);
+  return major > 0 || minor > 18 || (minor === 18 && patch >= 3);
 }
 
-function tryExec(command, args = []) {
-  try {
-    execFileSync(command, args, { stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
+function install(receipt) {
+  const claude = checkVersion();
+  if (claude.warning) console.warn(`Warning: ${claude.warning}`);
+  const enabled = claude.supported && link(pluginTarget, plugin, receipt, true);
+  if (!claude.supported && owned(pluginTarget, plugin, receipt)) {
+    if (exists(pluginTarget)) fs.unlinkSync(pluginTarget);
+    delete receipt.links[pluginTarget];
   }
-}
-
-function doInstall() {
-  // 1. Register hooks by delegating the merge to the atomic binary. The
-  //    manifest in this repo is the source of truth — when Claude Code changes
-  //    its hook schema, edit the manifest and re-publish; no `atomic` rebuild.
-  const hasAtomic = tryExec("atomic", ["--version"]);
-  if (hasAtomic) {
-    const installed = tryExec("atomic", ["agent", "enable", "--hooks", MANIFEST]);
-    if (!silent) {
-      console.log(
-        installed
-          ? "  hooks: registered via atomic agent enable --hooks → ~/.claude/settings.json"
-          : "  hooks: enable failed (see output above)",
-      );
-    }
+  let partial = false;
+  const version = atomic(['--version']);
+  if (!version.ok || !compatibleAtomic(version.stdout)) {
+    partial = true;
+    console.warn(`Warning: recording hooks were not installed. Atomic 0.18.3+ is required. ${version.ok ? 'Unsupported version: ' + version.stdout.trim() : version.diagnostic} Install/update Atomic and rerun this installer.`);
   } else {
-    if (!silent) {
-      console.warn("  hooks: skipped (atomic not found on PATH)");
-      console.warn(
-        `         after installing Atomic, run: atomic agent enable --hooks "${MANIFEST}"`,
-      );
+    const result = atomic(['agent', 'enable', '--hooks', manifest]);
+    if (!result.ok) {
+      partial = true;
+      process.exitCode = 1;
+      console.error(`Atomic hook installation failed: ${result.diagnostic}`);
+    } else {
+      receipt.hooksInstalled = true;
+      if (!silent) console.log('  hooks: installed');
     }
   }
-
-  // 2. Symlink skills
-  let linked = 0;
-  let skipped = 0;
-
-  for (const { src, dst } of SKILL_LINKS) {
-    const srcPath = path.join(PKG_DIR, src);
-    const dstPath = path.join(SKILLS_TARGET, dst);
-    const dstExists = entryExists(dstPath);
-
-    if (!fs.existsSync(srcPath)) {
-      if (!silent) console.warn(`  skip: ${src} (not found in package)`);
-      continue;
-    }
-
-    if (dstExists && !isOurSymlink(dstPath, srcPath)) {
-      skipped++;
-      if (!silent) console.log(`  keep: ${dst} (user file, not overwriting)`);
-      continue;
-    }
-
-    if (dstExists) {
-      fs.unlinkSync(dstPath);
-    }
-
-    ensureDir(dstPath);
-    fs.symlinkSync(srcPath, dstPath);
-    linked++;
-    if (!silent) console.log(`  link: skills/${dst}`);
-  }
-
-  // 3. Symlink agents
-  let agentsLinked = 0;
-
-  for (const { src, dst } of AGENT_LINKS) {
-    const srcPath = path.join(PKG_DIR, src);
-    const dstPath = path.join(AGENTS_TARGET, dst);
-    const dstExists = entryExists(dstPath);
-
-    if (!fs.existsSync(srcPath)) {
-      if (!silent) console.warn(`  skip: ${src} (not found in package)`);
-      continue;
-    }
-
-    if (dstExists && !isOurSymlink(dstPath, srcPath)) {
-      skipped++;
-      if (!silent) console.log(`  keep: agents/${dst} (user file, not overwriting)`);
-      continue;
-    }
-
-    if (dstExists) {
-      fs.unlinkSync(dstPath);
-    }
-
-    ensureDir(dstPath);
-    fs.symlinkSync(srcPath, dstPath);
-    agentsLinked++;
-    if (!silent) console.log(`  link: agents/${dst}`);
-  }
-
+  for (const item of components) if (!link(item.dst, item.src, receipt)) partial = true;
+  if (claude.supported && !enabled) partial = true;
+  saveReceipt(receipt);
   if (!silent) {
-    console.log();
-    console.log(
-      `✓ atomic-claude installed (${linked} skills, ${agentsLinked} agents linked, ${skipped} skipped)`,
-    );
-    console.log();
-    console.log(
-      "Copy CLAUDE.md into your project root to enable the agent prompt:",
-    );
-    console.log(
-      `  cp ${path.join(PKG_DIR, "CLAUDE.md")} /path/to/your/project/`,
-    );
-    console.log();
+    console.log(partial ? 'Atomic files installed with omissions; see diagnostics above.' : 'Atomic integration installed.');
+    console.log(enabled ? 'Restart Claude Code or run /reload-plugins; try /atomic-status.' : `Legacy instructions: copy ${path.join(root, 'CLAUDE.md')} to your project.`);
   }
 }
 
-function doUninstall() {
-  // 1. Remove hooks via the same manifest (delegated to the atomic binary)
-  const hasAtomic = tryExec("atomic", ["--version"]);
-  if (hasAtomic) {
-    tryExec("atomic", ["agent", "disable", "--hooks", MANIFEST]);
-    if (!silent) console.log("  hooks: removed from ~/.claude/settings.json");
+function uninstall(receipt) {
+  let hooksRemoved = !receipt.hooksInstalled;
+  const version = atomic(['--version']);
+  if (version.ok) {
+    const result = atomic(['agent', 'disable', '--hooks', manifest]);
+    hooksRemoved = result.ok;
+    if (!result.ok) { console.error(`Atomic hook removal failed: ${result.diagnostic}`); process.exitCode = 1; }
+  } else if (receipt.hooksInstalled) {
+    console.error(`Cannot remove installed Atomic hooks: ${version.diagnostic}. Restore Atomic on PATH and retry uninstall.`);
+    process.exitCode = 1;
   }
-
-  // 2. Remove skill symlinks
-  let removed = 0;
-
-  for (const { src, dst } of SKILL_LINKS) {
-    const srcPath = path.join(PKG_DIR, src);
-    const dstPath = path.join(SKILLS_TARGET, dst);
-
-    if (isOurSymlink(dstPath, srcPath)) {
-      fs.unlinkSync(dstPath);
-      removed++;
-      if (!silent) console.log(`  unlink: skills/${dst}`);
-
-      const dir = path.dirname(dstPath);
-      try {
-        fs.rmdirSync(dir);
-      } catch {
-        /* not empty */
-      }
+  for (const item of [{ src: plugin, dst: pluginTarget }, ...components]) {
+    if (owned(item.dst, item.src, receipt)) {
+      if (exists(item.dst)) fs.unlinkSync(item.dst);
+      delete receipt.links[item.dst];
     }
   }
-
-  // 3. Remove agent symlinks
-  for (const { src, dst } of AGENT_LINKS) {
-    const srcPath = path.join(PKG_DIR, src);
-    const dstPath = path.join(AGENTS_TARGET, dst);
-
-    if (isOurSymlink(dstPath, srcPath)) {
-      fs.unlinkSync(dstPath);
-      removed++;
-      if (!silent) console.log(`  unlink: agents/${dst}`);
-    }
-  }
-
-  if (!silent) {
-    console.log();
-    console.log(`✓ atomic-claude uninstalled (${removed} links removed)`);
-    console.log("  Note: CLAUDE.md in project roots must be removed manually.");
-  }
+  if (hooksRemoved) receipt.hooksInstalled = false;
+  saveReceipt(receipt);
+  if (!silent) console.log(hooksRemoved ? 'Installer-owned Atomic links and hook entries removed.' : 'Installer-owned links removed; hook removal remains incomplete.');
 }
 
-if (uninstall) {
-  doUninstall();
-} else {
-  doInstall();
-}
+try {
+  if (process.argv.includes('--check')) {
+    const result = checkVersion();
+    if (result.warning) console.warn(`Warning: ${result.warning}`);
+    else console.log(`Claude Code ${result.version}: Atomic mods supported.`);
+    process.exitCode = result.supported ? 0 : 1;
+  } else {
+    const receipt = loadReceipt();
+    if (process.argv.includes('--uninstall')) uninstall(receipt);
+    else install(receipt);
+  }
+} catch (error) { console.error(`Atomic installer failed: ${error.message}`); process.exitCode = 1; }

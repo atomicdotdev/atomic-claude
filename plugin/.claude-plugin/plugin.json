@@ -1,0 +1,11 @@
+{
+  "name": "atomic",
+  "version": "0.2.0",
+  "description": "Atomic graph-and-patch VCS: live views, intent tracking, review, and automatic provenance.",
+  "author": { "name": "Atomic", "url": "https://atomic.dev" },
+  "homepage": "https://atomic.dev",
+  "repository": "https://atomic.atomic.storage/workspaces/oss/projects/atomic-claude/code",
+  "license": "Apache-2.0",
+  "types": "./types/index.d.ts",
+  "metadata": { "minimumClaudeCodeVersion": "2.1.287" }
+}

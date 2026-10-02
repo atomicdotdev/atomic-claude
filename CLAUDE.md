@@ -34,18 +34,20 @@ Never invent missing project facts. If a candidate is marked `truncated`, inspec
 ### 2. Check for an existing intent
 
 ```bash
-atomic vault intent list
+atomic intent list
 ```
 
 If an existing intent covers the same unit of work, continue it. Do not create a duplicate.
 
+When the main Claude conversation has the mod tool `mcp__atomic__set_active_intent`, announce the exact ID of the intent you actually choose to work on. Announce a newly created intent once its ID exists; announce switches, and pass `intent_id: null` when leaving an intent or doing unrelated work. This is only a session-local display hint and does not approve the intent or change its status. Do not select from list order/status. Subagents report their intent ID to the parent rather than selecting the parent conversation's intent. If the mod tool is unavailable, continue the normal Atomic workflow without it.
+
 ### 3. Create an intent if needed
 
 ```bash
-atomic vault intent create --title "Implement JWT signing"
+atomic intent new "Implement JWT signing"
 ```
 
-Generate a short title that follows the same safe shell-argument rule; never paste raw user text. This gives you an intent ID (e.g., HELL-4) and a file path.
+Generate a short title that follows the same safe shell-argument rule; never paste raw user text. This gives you an intent ID and a file path. The current CLI uses `atomic intent`; the old `atomic vault intent` namespace was removed.
 
 ### 4. Define the problem
 
@@ -60,7 +62,7 @@ Once the problem is clear, define:
 - **Tasks** — ordered list of work items
 - **Source memories** — only when memory research is supported and candidates were actually selected for this Intent
 
-Write all of this into the `intent_file` path returned by `atomic vault intent create`. Replace every REPLACE placeholder. When Source Memories were selected, derive each wiki-link key from `path` by removing the `memory/` prefix and `.md` suffix, then record the exact returned path, `memory_id`, and `revision_hash`:
+Write all of this into the exact file path returned by `atomic intent new`. Replace every directive stub. Include a mandatory `:::why`, at least one `:::acceptance-criterion` and `:::task`, file references, scope, and constraints. When Source Memories were selected, derive each wiki-link key from `path` by removing the `memory/` prefix and `.md` suffix, then record the exact returned path, `memory_id`, and `revision_hash`:
 
 ```markdown
 ## Source Memories
@@ -69,7 +71,7 @@ Write all of this into the `intent_file` path returned by `atomic vault intent c
 
 For example, `memory/authentication-policy.md` becomes `[[authentication-policy]]`. Use the exact `memory_id` returned by the command; do not invent a canonical ID. Do not use the display `name` or `memory_id` inside the wiki-link, and do not link every search result. A selected wiki-link means the memory actually informed this Intent. After `atomic vault sync`, search using the validated agent-authored Intent title, copy and validate the returned Intent node ID, then inspect that exact node with `atomic vault query neighbors`. Verify every selected memory has a `REFERENCES` edge; a successful sync alone does not prove best-effort KG indexing succeeded. In compatibility mode or when no memory was selected, do not add or fabricate Source Memory links.
 
-Then run `atomic vault sync` to persist the file into the vault database. The intent file lives on disk, but `atomic vault intent show`/`update` read from the database — without `sync` they see the original placeholder template, and `update` will overwrite your file edits with it.
+Then run `atomic vault sync` to persist the file into the vault database. `atomic intent show`/`update` read from the database — without `sync` they see the original scaffold, and `update` will overwrite your file edits with it.
 
 Present the intent to the user and wait for explicit acceptance before writing code. After acceptance, always sync the Intent:
 
@@ -86,7 +88,8 @@ atomic vault context --intent <ID> --format json
 `--intent` performs a fresh search; its output is not automatically approved context. Use only entries whose `path` and `revision_hash` match the approved Source Memories. Ignore unrelated results. If a selected memory is missing or changed, or a new candidate would materially change the Intent, update the Intent and ask the user to accept it again. If compatibility mode is active or the accepted Intent has no Source Memories, skip this retrieval. Once any selected set is unchanged, mark the Intent planned:
 
 ```bash
-atomic vault intent update <ID> --status planned
+atomic intent update <ID> --status planned
+atomic intent update <ID> --status in_progress
 ```
 
 ### 5. Execute the tasks
@@ -96,9 +99,9 @@ Work through the TODOs in order. After completing each one:
 1. **Verify** it meets its criteria — run the commands or checks specified in the TODO.
 2. **Edit the intent file** using your file editing tool to mark it done:
    ```
-   - [ ] `HELL-1/1` ...   →   - [x] `HELL-1/1` ...
+   :::task{#<uid>-1 status=open ...} → :::task{#<uid>-1 status=done ...}
    ```
-   Also check off any acceptance criteria that are now satisfied.
+   Set satisfied acceptance criteria to `status=met`, with `verifiedBy` and `evidence` naming the checker and verification result.
 3. **Sync** so the database stays current:
    ```bash
    atomic vault sync
@@ -110,10 +113,14 @@ Work through the TODOs in order. After completing each one:
 
 ```bash
 atomic vault sync                          # persist file edits to the database first
-atomic vault intent update <ID> --status done
+atomic intent validate <ID>
+atomic intent attest <ID>
+atomic intent update <ID> --status needs-review
 ```
 
 Always `atomic vault sync` before `intent update` — `update` re-materializes the database copy over the file, so an unsynced update discards your edits.
+
+An unsigned intent's validation may report only missing attribution/proof; attest fills those. Fix all content violations before attesting, and verify the signed intent. Implementation ends at `needs-review`, ready for independent review.
 
 **Do NOT run `atomic add` or `atomic record`.** The hook system records your changes automatically with full AI provenance (model, tokens, session, timing) when the turn ends. (`atomic vault sync` is not `record` — it only moves your `.vault/` edits into the vault database, and you must run it.)
 
@@ -134,6 +141,7 @@ Always `atomic vault sync` before `intent update` — `update` re-materializes t
 - **Do not run `atomic add` or `atomic record`.** Hooks handle this with provenance.
 - **Do run `atomic vault sync` after editing any `.vault/` file**, and before `atomic vault intent show`/`update`. It deflates your on-disk edits into the vault database; it is not `record` and hooks do not do it for you mid-turn.
 - **Do not create or switch views.** The session view is created automatically.
+- **Session exit keeps the session view available for review.** Sandbox sessions retain the view specified by their Atomic sandbox pointer.
 - **Do not run `atomic agent enable`.** The integration is already configured globally.
 
 ## Skills

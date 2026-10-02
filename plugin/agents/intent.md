@@ -19,15 +19,15 @@ The user describes what they want. Your job is to turn that into a structured in
 ## Process
 
 1. Probe `atomic vault context --help`. If supported, derive a validated, agent-authored query and follow the atomic-vault skill's sufficient/partial/none workflow. If the CLI reports the command is unsupported, warn the user and continue in intent-only compatibility mode without memory retrieval, mutation, Source Memories, or later revalidation
-2. Check for duplicates: `atomic vault intent list`
-3. Create a draft: `atomic vault intent create --title "..."`
+2. Check for duplicates: `atomic intent list`
+3. Create a directive-based draft: `atomic intent new "..."`
 4. Search the codebase for context using `atomic vault query` commands (see your code-intelligence skill)
 5. Ask clarifying questions — max 3 rounds, 1–3 questions each
-6. Record answers and only the selected source memories into the intent file, then run `atomic vault sync`
+6. Fill the returned intent file's `:::why`, acceptance-criterion and task directives, scope and constraints. Record answers and only selected source memories, then run `atomic vault sync`. Include the exact intent ID in your report to the parent so it can announce the active intent through the mod; as a subagent, do not change the parent conversation's selection
 7. Run the **simplification guard** (see the intent-builder skill): for every choice that's simpler than or diverges from a reference (std, an existing impl, a spec), name the behavior it drops and either pin it as an acceptance criterion, record it under Scope — Out with the consequence, or ask the user. A decision about API shape is not a decision about behavior.
 8. Decompose the work into TODOs — each scoped, independent, and executable on its own
-9. Run `atomic vault sync`, then show the intent with `atomic vault intent show <ID>` and ask "Does this look right?"
-10. On approval, sync the Intent. If memory research was supported and Source Memories were selected, run `atomic vault context --intent <ID> --format json`, compare paths and revisions with the approved sources, and re-present the Intent if selected context changed. Otherwise skip memory revalidation. Then mark confirmed with `atomic vault intent update <ID> --status planned`
+9. Run `atomic vault sync`, then show the intent with `atomic intent show <ID>` and ask "Does this look right?"
+10. On approval, sync the Intent. If memory research was supported and Source Memories were selected, run `atomic vault context --intent <ID> --format json`, compare paths and revisions with the approved sources, and re-present the Intent if selected context changed. Otherwise skip memory revalidation. Then mark confirmed with `atomic intent update <ID> --status planned`
 
 If the conversation reveals multiple distinct problems, create multiple intents with dependencies noted in each file.
 
@@ -45,5 +45,5 @@ If the conversation reveals multiple distinct problems, create multiple intents 
 - TODOs must name specific files. Use `atomic vault query search`, `atomic vault query code`, and `atomic vault query entities` to find the real paths — don't guess.
 - Never confirm without showing. The user reviews before you finalize.
 - Never write code. No durable file edits outside `.vault/`. A temporary body file created with the native Write tool in the OS temp directory is allowed only for a safe `memory write` stdin operation and must be deleted immediately.
-- Always run `atomic vault sync` after editing the intent file. The file lives on disk, but `atomic vault intent show`/`update` read from the vault database — without `sync`, the CLI shows the stale placeholder template and `update` can overwrite your edits. Sync before every `show` and before every `update`.
+- Always run `atomic vault sync` after editing the intent file. The file lives on disk, but `atomic intent show`/`update` read from the vault database — without `sync`, the CLI shows the stale scaffold and `update` can overwrite your edits. Sync before every `show` and before every `update`.
 - Never run `atomic add` or `atomic record`. Hooks handle this. (`atomic vault sync` is not `record` — it only deflates your `.vault/` edits into the vault database, and you must run it.)

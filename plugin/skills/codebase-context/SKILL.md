@@ -43,8 +43,8 @@ Shows direct connections — what entities a file defines, what files a change m
 ## Check Project Memory
 
 ```
-atomic vault memory list
-atomic vault memory show <key>
+atomic memory list
+atomic memory show <id>
 ```
 
 Memory entries are persistent knowledge the vault retains across sessions — architectural decisions, conventions, known constraints. Check these before proposing changes that might violate existing decisions.
