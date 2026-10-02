@@ -6,12 +6,12 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "..");
 const agentPrompt = fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
 const vaultSkill = fs.readFileSync(
-  path.join(root, "skills", "atomic-vault", "SKILL.md"),
+  path.join(root, "plugin", "skills", "atomic-vault", "SKILL.md"),
   "utf8",
 );
-const intentAgent = fs.readFileSync(path.join(root, "agents", "intent.md"), "utf8");
+const intentAgent = fs.readFileSync(path.join(root, "plugin", "agents", "intent.md"), "utf8");
 const intentBuilder = fs.readFileSync(
-  path.join(root, "skills", "intent-builder", "SKILL.md"),
+  path.join(root, "plugin", "skills", "intent-builder", "SKILL.md"),
   "utf8",
 );
 
@@ -27,7 +27,7 @@ test("researches memory before creating an intent", () => {
 
   for (const document of [agentPrompt, workflow]) {
     assert.match(document, /atomic vault context/);
-    assert.match(document, /atomic vault intent create --title/);
+    assert.match(document, /atomic intent new/);
   }
 });
 
@@ -69,7 +69,7 @@ test("requires separate user approval before any memory mutation", () => {
   }
 
   const approvalGuard = vaultSkill.indexOf("### Require approval before mutation");
-  const approvedWrite = vaultSkill.indexOf("atomic vault memory write", approvalGuard);
+  const approvedWrite = vaultSkill.indexOf("atomic memory write", approvalGuard);
   assert.ok(approvalGuard >= 0 && approvalGuard < approvedWrite);
   assert.match(vaultSkill, /If the user declines or does not confirm, continue without mutating Vault/);
 });
@@ -77,7 +77,7 @@ test("requires separate user approval before any memory mutation", () => {
 test("documents safe stdin memory writes and selected-source links", () => {
   assert.match(
     vaultSkill,
-    /atomic vault memory write authentication-policy --type project < "/,
+    /atomic memory write authentication-policy --type project < "/,
   );
   assert.doesNotMatch(vaultSkill, /<<['"]?MEMORY/);
   assert.match(vaultSkill, /mktemp/);
@@ -112,7 +112,7 @@ test("inspects truncated candidates before classification", () => {
 test("the intent agent runs the same memory-first workflow", () => {
   assert.match(intentAgent, /  - atomic-vault/);
   const research = intentAgent.indexOf("atomic vault context");
-  const createIntent = intentAgent.indexOf("atomic vault intent create");
+  const createIntent = intentAgent.indexOf("atomic intent new");
   assert.ok(research >= 0 && research < createIntent);
   assert.match(intentAgent, /tools: Bash, Read, Edit, Write/);
 });
@@ -135,9 +135,9 @@ test("revalidates intent-seeded context before planning", () => {
 });
 
 test("uses the returned intent path and verifies provenance edges", () => {
-  assert.match(vaultSkill, /exact `intent_file` returned/);
+  assert.match(vaultSkill, /exact returned file path/);
   assert.doesNotMatch(vaultSkill, /\.vault\/intents\/<id>\/intent\.md/);
-  assert.match(intentBuilder, /exact `intent_file` returned/);
+  assert.match(intentBuilder, /exact returned file path/);
   assert.doesNotMatch(intentBuilder, /\.vault\/intents\/<id>\/intent\.md/);
   assert.match(vaultSkill, /sync success alone is not proof/);
 });

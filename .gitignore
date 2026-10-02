@@ -1,3 +1,5 @@
 node_modules
 bun.lock
 *.tgz
+plugin/.claude-plugin/types/
+plugin/tsconfig.json

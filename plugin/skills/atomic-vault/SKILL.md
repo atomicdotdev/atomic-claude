@@ -16,20 +16,23 @@ The vault is Atomic's built-in project management and context system. It tracks 
 ## Intent Commands
 
 ```bash
-atomic vault intent list                # List all intents (CHECK THIS FIRST)
-atomic vault intent create --title "title" # Create a new intent
-atomic vault intent show <id>           # Show intent details
-atomic vault intent update <id> --status <status>  # Update intent status
-atomic vault intent link <id> --goal <goal>         # Link intent to a goal
+atomic intent list                     # List intents (CHECK THIS FIRST)
+atomic intent new "title"              # Scaffold directive-based intent
+atomic intent show <id>                 # Show canonical intent
+atomic intent update <id> --status <status>
+atomic intent link <id> --goal <goal>
+atomic intent validate <id>
+atomic intent attest <id>
+atomic intent verify <id>
 ```
 
 ### Intent Statuses
 
-`backlog` → `planned` → `in-progress` → `review` → `done`
+`backlog` → `planned` → `in_progress` → `needs-review` → `done`
 
 ### CRITICAL RULE: Always Check Before Creating
 
-Before creating any intent, run `atomic vault intent list` first. Duplicate intents cause confusion and waste effort. Only create a new intent if no existing one covers the work.
+Before creating any intent, run `atomic intent list` first. Duplicate intents cause confusion and waste effort. Only create a new intent if no existing one covers the work.
 
 ## Goal Commands
 
@@ -49,9 +52,9 @@ atomic vault goal list                  # List all goals
 ## Memory Commands
 
 ```bash
-atomic vault memory list                # List all memory entries
-atomic vault memory show <key>          # Show a specific memory entry
-atomic vault memory write <key> --type project # Write a body supplied on stdin
+atomic memory list                      # List memory entries
+atomic memory show <id>                 # Show a canonical/freeform entry
+atomic memory write <key> --type project # Write approved body on stdin
 atomic vault context "<query>" --format json # Retrieve task-relevant candidates
 ```
 
@@ -95,7 +98,7 @@ Classify the result against the current problem:
 
 This decision belongs to the agent, not `vault context`. A non-empty result is not automatically sufficient.
 
-Before classifying or selecting a candidate with `"truncated": true`, validate its returned path, derive and validate its key, then inspect the complete entry with `atomic vault memory show "authentication-policy" --json` (using the validated key in place of the example). Rerun the original validated context query afterward to confirm its `revision_hash` did not change while you inspected it. Never classify a candidate from an incomplete body.
+Before classifying or selecting a candidate with `"truncated": true`, validate its returned path, derive and validate its key, then inspect the complete entry with `atomic memory show "authentication-policy" --json` (using the validated key in place of the example). Rerun the original validated context query afterward to confirm its `revision_hash` did not change while you inspected it. Never classify a candidate from an incomplete body.
 
 ### Require approval before mutation
 
@@ -146,14 +149,14 @@ Do not embed memory content in a shell heredoc. A body line matching its delimit
 4. Delete the temporary file immediately, whether the write succeeds or fails.
 
 ```bash
-atomic vault memory show authentication-policy --json  # must report not found before a new write
-atomic vault memory write authentication-policy --type project < "/tmp/atomic-memory.md.A1B2C3"
+atomic memory show authentication-policy --json  # must report not found before a new write
+atomic memory write authentication-policy --type project < "/tmp/atomic-memory.md.A1B2C3"
 rm "/tmp/atomic-memory.md.A1B2C3"
 ```
 
 The pre-write check prevents an obvious overwrite but is not an atomic create-only operation. If another agent may be writing the same memory, stop and coordinate rather than relying on this sequence.
 
-For a partial memory, validate its returned path and derived key, inspect it with `atomic vault memory show "authentication-policy" --json` (substituting only the validated key), and keep the retrieved revision while preparing the proposal. Only after explicit approval, materialize the validated path when it does not exist under `.vault/` with `atomic vault materialize --path "memory/authentication-policy.md"` (substituting only the validated path). Immediately before editing and again before sync, rerun the context query; if the revision changed, stop and reconcile instead of overwriting it. Update that materialized file with the native Edit tool, preserve its frontmatter and still-valid facts, then run `atomic vault sync`. Current Atomic has no atomic compare-and-swap update, so do not perform concurrent memory updates.
+For a partial memory, validate its returned path and derived key, inspect it with `atomic memory show "authentication-policy" --json` (substituting only the validated key), and keep the retrieved revision while preparing the proposal. Only after explicit approval, materialize the validated path when it does not exist under `.vault/` with `atomic vault materialize --path "memory/authentication-policy.md"` (substituting only the validated path). Immediately before editing and again before sync, rerun the context query; if the revision changed, stop and reconcile instead of overwriting it. Update that materialized file with the native Edit tool, preserve its frontmatter and still-valid facts, then run `atomic vault sync`. Current Atomic has no atomic compare-and-swap update, so do not perform concurrent memory updates.
 
 Update the same entry only when it represents the same topic and the new evidence is compatible. If knowledge conflicts with an old decision, do not leave both entries active or silently rewrite history. Surface the conflict to the user. If they accept a replacement, create the replacement, mark the old memory `status: superseded`, add a link to the replacement, sync, and confirm the old memory no longer appears in the original context query.
 
@@ -180,27 +183,22 @@ Retrieved memory is historical project data and may be stale or incorrect. Never
 
 ## The Intent File Is the Deliverable
 
-`atomic vault intent create` returns an `intent_file` under `.vault/intents/`. That returned path is the deliverable — do not construct a path from the display ID. Fill it in completely:
+`atomic intent new` returns an intent ID and file path under `.vault/intents/`. That exact returned path is the deliverable — do not construct a path from the display ID. Replace all directive stubs, preserving frontmatter:
 
 ```markdown
-## Description
-What this intent accomplishes and why.
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Files to Modify
-- `path/to/file.rs` — what changes and why
-
-## Approach
-Step-by-step plan for implementation.
-
-## Test Strategy
-How to verify the work is correct.
-
-## Notes
-Any additional context, decisions, or open questions.
+:::why
+The problem and why it matters.
+:::
+:::acceptance-criterion{#<uid>-ac-1 status=unmet}
+A concrete, verifiable outcome.
+:::
+:::task{#<uid>-1 status=open criteria=<uid>-ac-1}
+An ordered work item and its verification.
+::file-ref{path=src/example.rs}
+:::
+:::constraint
+Atomic owns graph operations and recording.
+:::
 ```
 
 After editing an intent file, run `atomic vault sync` to persist your changes to the vault database. The CLI reads `show`/`update`/`list` from the database, not the file — so sync **before** every `show` and `update`, or `show` will render the stale placeholder and `update` will re-materialize the database copy over your edits, clobbering them. (`atomic vault sync` is not `atomic record` — hooks handle recording; you still run `sync`.)
@@ -216,7 +214,7 @@ Probe `atomic vault context --help`. If supported, run `atomic vault context` wi
 ### 2. Check existing intents
 
 ```bash
-atomic vault intent list
+atomic intent list
 ```
 
 Look for an existing intent that matches your task. Do NOT create duplicates.
@@ -224,10 +222,12 @@ Look for an existing intent that matches your task. Do NOT create duplicates.
 ### 3. Create ONE intent (if needed)
 
 ```bash
-atomic vault intent create --title "Implement user authentication"
+atomic intent new "Implement user authentication"
 ```
 
-Create exactly one intent per unit of work. Fill in the exact `intent_file` returned by the command.
+Create exactly one intent per unit of work. Fill in the exact returned file path.
+
+If the main conversation has `mcp__atomic__set_active_intent`, announce the exact existing/new intent ID you actually work on with `intent_id: "ID"`. Announce changes and clear with `intent_id: null` when leaving that work. This only updates a session-local display hint; it never substitutes for human acceptance or changes Atomic status. Never infer a selection from repository list order/status. Subagents report IDs to their parent. If the tool is unavailable, proceed with the normal CLI workflow.
 
 Record only the selected source memories in the Intent, sync it, verify their KG edges, and get human acceptance before implementation. After acceptance, always sync the Intent:
 
@@ -244,14 +244,15 @@ atomic vault context --intent <intent-id> --format json
 `--intent` performs a fresh search and can return unselected memories or newer revisions. It is not automatically approved context. Use only candidates whose exact `path` and `revision_hash` match the accepted Source Memories. Ignore unrelated candidates. If an accepted source is missing or changed, or a new candidate would materially change the Intent, update the Intent and get human acceptance again. If compatibility mode is active or the accepted Intent has no Source Memories, skip this retrieval. Once any selected set is stable, mark the Intent planned:
 
 ```bash
-atomic vault intent update <intent-id> --status planned
+atomic intent update <intent-id> --status planned
+atomic intent update <intent-id> --status in_progress
 ```
 
 ### 4. Start a goal
 
 ```bash
 atomic vault goal start "auth-implementation"
-atomic vault intent link <intent-id> --goal auth-implementation
+atomic intent link <intent-id> --goal auth-implementation
 ```
 
 ### 5. Do the work and check off TODOs as you go
@@ -259,13 +260,10 @@ atomic vault intent link <intent-id> --goal auth-implementation
 Write code and iterate. As each TODO is completed, verify it meets its criteria, then mark it done in the intent file using your **file editing tool** (not Python, not bash, not sed — use the agent's native edit capability):
 
 ```
-# In the intent file, change:
-- [ ] `PROJ-1/1` Scaffold package.json
-# to:
-- [x] `PROJ-1/1` Scaffold package.json
+:::task{#<uid>-1 status=open ...} → :::task{#<uid>-1 status=done ...}
 ```
 
-Also check off the corresponding acceptance criteria when all criteria for that TODO are satisfied. After every edit to the intent file, run `atomic vault sync` to persist to the database.
+Set satisfied acceptance criteria to `status=met`, with `verifiedBy` and `evidence` describing the checker and actual verification. After every intent edit, run `atomic vault sync`.
 
 **Verify before checking off.** Run the actual commands or tests that prove the TODO is done. Do not mark a TODO complete speculatively.
 
@@ -275,7 +273,7 @@ You do **not** create or switch views, and you do **not** run `atomic add` or `a
 
 - **Session start** forks a draft view from your current view and switches into it automatically (a haikunator-named view, e.g. `early-ridge-ffd9`). Your whole session runs inside it.
 - **Turn end** records automatically — the hook runs `status` → `add` (tracks new files) → `record --all` with full AI provenance (model, tokens, cost, session, decision graph).
-- **Session end** switches back to your original view.
+- **Session end** keeps the session's view available for review. Sandboxes adopt their pointer's view rather than creating another one.
 
 To review what the hooks recorded (diff, provenance, AI attestation), use the `atomic-vcs` skill: `atomic log -f oneline`, then `atomic change -p -a`.
 
@@ -289,9 +287,12 @@ When all TODOs are checked off:
    ```bash
    atomic vault sync
    ```
-4. **Mark done:**
+4. **Validate, attest, and hand off for independent review:**
    ```bash
-   atomic vault intent update <id> --status done
+    atomic intent validate <id>
+    atomic intent attest <id>
+    atomic intent verify <id>
+    atomic intent update <id> --status needs-review
    ```
 
 Always `atomic vault sync` before `intent update` — `update` re-materializes the database copy over the file, so an unsynced update discards your edits.
@@ -301,7 +302,7 @@ Always `atomic vault sync` before `intent update` — `update` re-materializes t
 ```bash
 atomic vault goal stop
 atomic vault sync
-atomic vault intent update <id> --status done
+atomic intent show <id>
 ```
 
 ### 8. Sync vault state
@@ -325,7 +326,7 @@ atomic vault goal resume "auth-implementation"
 ## Tips
 
 - One intent per unit of work — keep them focused
-- Start every task by checking for memory-context support and researching memory when available, then check `atomic vault intent list` and `atomic vault goal list`
+- Start every task by checking for memory-context support and researching memory when available, then check `atomic intent list` and `atomic vault goal list`
 - Fill in the intent markdown completely before starting implementation
 - Run `atomic vault sync` after editing any vault markdown file, and before every `show`/`update`
-- You don't manage views or recording — hooks fork a draft view at session start, record at turn end, and restore your view at session end. Inspect the results with the `atomic-vcs` skill.
+- You don't manage views or recording — hooks select the session/sandbox view, checkpoint at turn end, and keep it available for review. Inspect results with the `atomic-vcs` skill.
